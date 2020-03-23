@@ -48,7 +48,7 @@ class Fake(object):
         return data
 
 
-class Chinatown(object):
+class Factory(object):
     def __init__(self, primes: tuple, fake_fakes: bool = False) -> None:
         lenp = len(primes)
         voices = [Fake(primes, None, primes).clone(add_fake=False)]
@@ -76,67 +76,3 @@ class Chinatown(object):
 
     def convert2cadence(self, gender=True):
         return old.Polyphon(self.convert2voices()).chordify()
-
-
-def convert_cadence2melody(cadence):
-    melody = old.JIMelody([])
-    for chord in cadence:
-        de = chord.delay
-        first = True
-        if chord.pitch:
-            sub = []
-            for pitch in chord.pitch:
-                if first is True:
-                    sub.append(old.Tone(pitch, de, de))
-                    first = False
-                else:
-                    sub.append(old.Tone(pitch, 0, de))
-            sub = list(reversed(sub))
-            melody.extend(sub)
-        else:
-            melody.append(old.Rest(de))
-    return melody
-
-
-if __name__ == "__main__":
-    import pyteq
-
-    ct = Chinatown((3, 5, 7, 11))
-    CONCERT_PITCH = 120
-    """
-    melody = convert_cadence2melody(ct.convert2cadence())
-    melody = [
-        pyteq.MidiTone(
-            ji.JIPitch(t.pitch, multiply=CONCERT_PITCH),
-            t.delay,
-            t.duration * 2,
-            volume=0.65,
-        )
-        for t in melody
-    ]
-    harp_range = tuple(n for n in range(20, 125))
-    f = pyteq.Pianoteq(melody, available_midi_notes=harp_range)
-    f.export2wav("test0", preset='"Erard Player"')
-    """
-    FACTOR = 0.3
-    for idx, voice in enumerate(ct.convert2voices()):
-        print(voice)
-        if idx == 0:
-            vol = 0.68
-        elif idx == 1:
-            vol = 0.6
-        elif idx == 2:
-            vol = 0.48
-
-        melody = [
-            pyteq.MidiTone(
-                ji.JIPitch(t.pitch, multiply=CONCERT_PITCH),
-                t.delay * FACTOR,
-                t.duration * FACTOR,
-                volume=vol,
-            )
-            for t in voice
-        ]
-        harp_range = tuple(n for n in range(20, 125))
-        f = pyteq.Pianoteq(melody, available_midi_notes=harp_range)
-        f.export2wav("test{0}".format(idx), preset='"Concert Harp Daily"')

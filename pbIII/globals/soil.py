@@ -712,9 +712,9 @@ class JICounterpoint(object):
         a pitch that represents the same harmonic position (in the respective group).
         """
 
-        from pbIII.soil import chinatown
+        from pbIII.soil import factory
 
-        ct = chinatown.Chinatown(primes)
+        ct = factory.Factory(primes)
         pitches_per_transposition_per_voice = []
         for idx, vox0, vox1 in zip(range(len(ct.voices)), ct.voices, ct.voices[1:]):
             vox0 = tuple(item for item in vox0 if not item.is_fake)
