@@ -188,9 +188,9 @@ BLUEPRINT_HARMONIES = {
 
 
 # volume for stereo mixdown
-GLITTER_VOLUME = 0.06
+GLITTER_VOLUME = 0.02
 VOICE_VOLUME = 1.6
-DIVA_VOLUME = 0.24
+DIVA_VOLUME = 0.35
 NATURAL_RADIO_VOLUME = 0.5
 
 GENERAL_FACTOR = 1
@@ -230,6 +230,9 @@ PBIII_ORCHESTRATION = MU.Orchestration(
     MU.Track("natural_radio_4", NATURAL_RADIO_VOLUME, 0.8),
     MU.Track("natural_radio_5", NATURAL_RADIO_VOLUME, 1),
     # voice samples
+    MU.Track("voice0", VOICE_VOLUME, 0),
+    MU.Track("voice1", VOICE_VOLUME, 0.5),
+    MU.Track("voice2", VOICE_VOLUME, 1),
 )
 
 MU_NAME = "pbIII/build"
@@ -237,3 +240,9 @@ MU_NAME = "pbIII/build"
 
 MALE_SOIL = soil.JICounterpoint()
 FEMALE_SOIL = soil.JICounterpoint(harmonic_gender=False)
+
+
+# DEFINING POSITIONS IN 6 CHANNEL MIX WHERE THE FIRST INDEX EQUALS THE FIRST
+# VOICE IN THE RESPECTIVE GENDER
+POSITIVE_VOICES_POSITION = (0, 2, 4)
+NEGATIVE_VOICES_POSITIONS = (3, 5, 1)

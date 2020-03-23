@@ -17,6 +17,7 @@ from pbIII.globals import globals
 from pbIII.engines import diva
 from pbIII.engines import glitter
 from pbIII.engines import pteq
+from pbIII.engines import radio
 
 
 class Silence(MU.Segment):
@@ -32,16 +33,12 @@ class Silence(MU.Segment):
 
 
 class ThreeVoiceCP(MU.Segment):
+    """General Segment class for Segments with counterpoint for 3 voices.
+
+    General more specific Segments could be generated through inheritance.
+    """
+
     orchestration = globals.PBIII_ORCHESTRATION
-
-    # 7. natural radio hinzufügen
-    # 8. stimmen hinzufügen
-    # GUTES RHYTHMISCHES MODELL ÜBERLEGEN?
-    # -> vielleicht dafür einfach mehrere verschiedene
-    # subklassen machen, mit unterschiedlichen constraints
-    # und unterschiedlichen techniken der rhythmus generierung
-    # zB. EndChord, ...
-
     counterpoint_class = counterpoint.ThreeVoiceRhythmicCP
 
     def __init__(
@@ -219,8 +216,74 @@ class ThreeVoiceCP(MU.Segment):
 
         return init_attributes
 
-    def make_natural_radio(self) -> dict:
+    @staticmethod
+    def make_natural_radio(
+        voices_main: tuple,
+        voices_side: tuple,
+        tempo_factor: float,
+        gender: bool,
+        make_envelope: bool,
+        samples: tuple,
+        n_changes: int,
+        crossfade_duration: float,
+        anticipation_time: float,
+        overlaying_time: float,
+        min_volume: float,
+        max_volume: float,
+        shadow_time: float,
+    ) -> dict:
+        # TODO(make voices, also add volume argument to diva voices)
+        # TODO(detect which loudspeaker is having which sample at which moment)
+
+        assert len(samples) in (1, 2, 3)
+
+        # are those asserts here really necessary?
+        assert shadow_time <= anticipation_time
+        assert shadow_time <= overlaying_time
+
+        inner_voices = globals.POSITIVE_VOICES_POSITION
+        outer_voices = globals.NEGATIVE_VOICES_POSITIONS
+
+        duration = float(voices_main[0].duration * tempo_factor)
+        duration += anticipation_time + overlaying_time
+
+        if not gender:
+            inner_voices, outer_voices = outer_voices, inner_voices
+
         init_attributes = {}
+
+        for voice_type, voices in enumerate((voices_main, voices_side)):
+            for voice_idx, voice in enumerate(voices):
+
+                sound_engine = radio.RadioEngine(
+                    voice,
+                    make_envelope,
+                    min_volume,
+                    max_volume,
+                    duration,
+                    tempo_factor,
+                    shadow_time,
+                    crossfade_duration,
+                    anticipation_time=anticipation_time,
+                    overlaying_time=overlaying_time,
+                    attack_duration=0.35,
+                    release_duration=0.35,
+                )
+
+                voice_name = "natural_radio_{}".format(
+                    (inner_voices, outer_voices)[voice_idx]
+                )
+
+                init_attributes.update(
+                    {
+                        voice_name: {
+                            "start": -anticipation_time,
+                            "duration": duration,
+                            "sound_engine": sound_engine,
+                        }
+                    }
+                )
+
         return init_attributes
 
     def make_speech(self) -> dict:

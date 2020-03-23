@@ -1,8 +1,6 @@
 import itertools
-import os
 
 from mutools import common_harmonics
-from mutools import csound
 from mutools import synthesis
 
 from mu.sco import old
@@ -11,7 +9,7 @@ from mu.utils import tools
 from pbIII.globals import globals
 
 
-class GlitterEngine(synthesis.SoundEngine):
+class GlitterEngine(synthesis.BasedCsoundEngine):
     def __init__(
         self,
         voice0: old.Melody,
@@ -46,7 +44,7 @@ class GlitterEngine(synthesis.SoundEngine):
         return harmonic_melodies
 
     @property
-    def __orc(self) -> str:
+    def orc(self) -> str:
         envelope_line = r"aEnv linseg 0, "
         envelope_line += r"{0}, 1, p3 - {0} - {1}, 1, {1}, 0".format(
             self.__attack_duration, self.__release_duration
@@ -66,7 +64,7 @@ class GlitterEngine(synthesis.SoundEngine):
         for instr_idx, ftable_name in enumerate(
             ("giSine", "giSaw", "giSquare", "giTri")
         ):
-            lines.append("instr {}".format(instr_idx))
+            lines.append("instr {}".format(instr_idx + 1))
             lines.append(r"asig poscil3 p5, p4, {}".format(ftable_name))
             lines.append(envelope_line)
             if instr_idx == 0:
@@ -77,7 +75,8 @@ class GlitterEngine(synthesis.SoundEngine):
 
         return "\n".join(lines)
 
-    def __make_score(self) -> str:
+    @property
+    def sco(self) -> str:
         lines = []
 
         instrument_number = itertools.cycle((1, 2, 1, 3, 1, 4, 1))
@@ -107,19 +106,6 @@ class GlitterEngine(synthesis.SoundEngine):
 
         return "\n".join(lines)
 
-    def render(self, name: str) -> None:
-        cname = ".glitter"
-        orc_name = "{}.orc".format(cname)
-        sco_name = "{}.sco".format(cname)
-
-        orc = self.__orc
-        sco = self.__make_score()
-
-        for fname, data in ((orc_name, orc), (sco_name, sco)):
-            with open(fname, "w") as f:
-                f.write(data)
-
-        csound.render_csound("{}.wav".format(name), orc_name, sco_name)
-
-        os.remove(orc_name)
-        os.remove(sco_name)
+    @property
+    def cname(self) -> str:
+        return ".glitter"
