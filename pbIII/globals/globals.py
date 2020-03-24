@@ -6,7 +6,7 @@ from pbIII.globals import soil
 
 """Defining global variables for the complete composition."""
 
-CONCERT_PITCH = 240
+CONCERT_PITCH = 250
 
 # naming standard:
 # y*z, x*y*z, w*x*y*z (/v)
@@ -188,10 +188,11 @@ BLUEPRINT_HARMONIES = {
 
 
 # volume for stereo mixdown
-GLITTER_VOLUME = 0.02
+GLITTER_VOLUME = 0.05
 VOICE_VOLUME = 1.6
 DIVA_VOLUME = 0.35
-NATURAL_RADIO_VOLUME = 0.5
+NATURAL_RADIO_VOLUME = 0.2
+SPEECH_VOLUME = 0.2
 
 GENERAL_FACTOR = 1
 
@@ -199,29 +200,30 @@ GLITTER_VOLUME *= GENERAL_FACTOR
 VOICE_VOLUME *= GENERAL_FACTOR
 DIVA_VOLUME *= GENERAL_FACTOR
 NATURAL_RADIO_VOLUME *= GENERAL_FACTOR
+SPEECH_VOLUME *= GENERAL_FACTOR
 
 PBIII_ORCHESTRATION = MU.Orchestration(
     # pianoteq voices
-    MU.Track("voiceP0", VOICE_VOLUME * 1.3, 0.6),
-    MU.Track("voiceP1", VOICE_VOLUME * 1.1, 0.1),
-    MU.Track("voiceP2", VOICE_VOLUME, 0.9),
-    MU.Track("voiceN0", VOICE_VOLUME * 1.3, 0.4),
-    MU.Track("voiceN1", VOICE_VOLUME * 1.1, 0.9),
-    MU.Track("voiceN2", VOICE_VOLUME, 0.1),
+    MU.Track("voiceP0", VOICE_VOLUME * 1.3, 0),
+    MU.Track("voiceP1", VOICE_VOLUME * 1.1, 0.4),
+    MU.Track("voiceP2", VOICE_VOLUME, 0.8),
+    MU.Track("voiceN0", VOICE_VOLUME * 1.3, 0.6),
+    MU.Track("voiceN1", VOICE_VOLUME * 1.1, 1),
+    MU.Track("voiceN2", VOICE_VOLUME, 0.2),
     # diva voices
     MU.Track("divaP0", DIVA_VOLUME, 0.6),
-    MU.Track("divaP1", DIVA_VOLUME * 0.7, 0.9),
-    MU.Track("divaP2", DIVA_VOLUME * 0.4, 0.1),
-    MU.Track("divaN0", DIVA_VOLUME, 0.4),
-    MU.Track("divaN1", DIVA_VOLUME * 0.7, 0.1),
-    MU.Track("divaN2", DIVA_VOLUME * 0.4, 0.9),
+    MU.Track("divaP1", DIVA_VOLUME * 0.7, 1),
+    MU.Track("divaP2", DIVA_VOLUME * 0.4, 0.2),
+    MU.Track("divaN0", DIVA_VOLUME, 0),
+    MU.Track("divaN1", DIVA_VOLUME * 0.7, 0.4),
+    MU.Track("divaN2", DIVA_VOLUME * 0.4, 0.8),
     # common harmonics between two voices
-    MU.Track("glitterP01", GLITTER_VOLUME, 0.25),
-    MU.Track("glitterP02", GLITTER_VOLUME, 0.75),
-    MU.Track("glitterP12", GLITTER_VOLUME, 0.5),
-    MU.Track("glitterN01", GLITTER_VOLUME, 0.75),
-    MU.Track("glitterN02", GLITTER_VOLUME, 0.25),
-    MU.Track("glitterN12", GLITTER_VOLUME, 0.5),
+    MU.Track("glitterP01", GLITTER_VOLUME, 0.2),
+    MU.Track("glitterP02", GLITTER_VOLUME, 0.4),
+    MU.Track("glitterP12", GLITTER_VOLUME, 0.6),
+    MU.Track("glitterN01", GLITTER_VOLUME, 0.8),
+    MU.Track("glitterN02", GLITTER_VOLUME, 0.4),
+    MU.Track("glitterN12", GLITTER_VOLUME, 0.6),
     # natural radio samples
     MU.Track("natural_radio_0", NATURAL_RADIO_VOLUME, 0),
     MU.Track("natural_radio_1", NATURAL_RADIO_VOLUME, 0.2),
@@ -230,9 +232,9 @@ PBIII_ORCHESTRATION = MU.Orchestration(
     MU.Track("natural_radio_4", NATURAL_RADIO_VOLUME, 0.8),
     MU.Track("natural_radio_5", NATURAL_RADIO_VOLUME, 1),
     # voice samples
-    MU.Track("voice0", VOICE_VOLUME, 0),
-    MU.Track("voice1", VOICE_VOLUME, 0.5),
-    MU.Track("voice2", VOICE_VOLUME, 1),
+    MU.Track("voice0", SPEECH_VOLUME, 0),
+    MU.Track("voice1", SPEECH_VOLUME, 0.5),
+    MU.Track("voice2", SPEECH_VOLUME, 1),
 )
 
 MU_NAME = "pbIII/build"

@@ -1,4 +1,6 @@
+import functools
 import itertools
+import operator
 
 from mu.mel import ji
 from mu.midiplug import midiplug
@@ -10,6 +12,8 @@ from mu.utils import prime_factors
 from mutools import MU
 from mutools import polyrhythms
 from mutools import pteqer
+from mutools import schillinger
+
 
 from pbIII.fragments import counterpoint
 from pbIII.globals import globals
@@ -20,8 +24,12 @@ from pbIII.engines import pteq
 from pbIII.engines import radio
 
 
-class Silence(MU.Segment):
+class PBIII_Segment(MU.Segment):
     orchestration = globals.PBIII_ORCHESTRATION
+
+
+class Silence(PBIII_Segment):
+    """Segment class that generates only silence, for rests etc."""
 
     def __init__(self, name: str, duration: float):
         self.__duration = duration
@@ -32,13 +40,30 @@ class Silence(MU.Segment):
         return self.__duration
 
 
-class ThreeVoiceCP(MU.Segment):
+class CyclicPermutation(object):
+    """Helper class for distributing natural radio sounds on different speaker."""
+
+    def __init__(self, pattern: tuple) -> None:
+        self.__cycle = itertools.cycle(tuple(set(schillinger.permute_cyclic(pattern))))
+        self.__pattern = pattern
+
+    def __repr__(self) -> str:
+        return "CyclicPermutation({})".format(self.pattern)
+
+    def __next__(self) -> tuple:
+        return next(self.__cycle)
+
+    @property
+    def pattern(self) -> tuple:
+        return self.__pattern
+
+
+class ThreeVoiceCP(PBIII_Segment):
     """General Segment class for Segments with counterpoint for 3 voices.
 
-    General more specific Segments could be generated through inheritance.
+    More specific Segments could be generated through inheritance.
     """
 
-    orchestration = globals.PBIII_ORCHESTRATION
     counterpoint_class = counterpoint.ThreeVoiceRhythmicCP
 
     def __init__(
@@ -55,6 +80,19 @@ class ThreeVoiceCP(MU.Segment):
         include_glitter: bool = True,
         include_natural_radio: bool = True,
         include_speech: bool = True,
+        dynamic_range_of_voices: tuple = (0.2, 0.95),
+        max_spectrum_profile_change: int = 10,
+        radio_samples: tuple = (
+            "pbIII/samples/radio/bielefeld/2.wav",
+            "pbIII/samples/radio/UK/4.wav",
+            "pbIII/samples/radio/Italy/2.wav",
+        ),
+        radio_average_volume: float = 0.25,
+        radio_min_volume: float = 0.6,
+        radio_max_volume: float = 1,
+        radio_n_changes: int = 3,
+        radio_crossfade_duration: float = 0.5,
+        radio_shadow_time: float = 0.15,
     ) -> None:
         self.__n_bars = n_bars
         self.__gender_code = ("N", "P")[int(gender)]
@@ -97,6 +135,28 @@ class ThreeVoiceCP(MU.Segment):
 
         self.__duration_per_voice = duration_per_bar * self.__n_bars
 
+        self.__voices_inner = tuple(
+            old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
+            for vox in self.__counterpoint_result[0]
+        )
+        self.__attribute_maker_inner = pteqer.AttributeMaker(
+            self.__voices_inner,
+            metricity_per_beat=self.__weight_per_beat,
+            max_spectrum_profile_change=max_spectrum_profile_change,
+            dynamic_range=dynamic_range_of_voices,
+        )
+
+        self.__voices_outer = tuple(
+            old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
+            for vox in self.__counterpoint_result[1]
+        )
+        self.__attribute_maker_outer = pteqer.AttributeMaker(
+            self.__voices_outer,
+            metricity_per_beat=self.__weight_per_beat,
+            max_spectrum_profile_change=max_spectrum_profile_change,
+            dynamic_range=dynamic_range_of_voices,
+        )
+
         # make pianoteq voices
         if include_voices:
             init_attributes.update(self.make_voices())
@@ -111,7 +171,44 @@ class ThreeVoiceCP(MU.Segment):
 
         # make natural radio voices
         if include_natural_radio:
-            init_attributes.update(self.make_natural_radio())
+            voices_inner_and_outer = []
+            for voices, volume_per_voice in (
+                (
+                    self.__voices_inner,
+                    self.__attribute_maker_inner.volume_per_tone_per_voice,
+                ),
+                (
+                    self.__voices_outer,
+                    self.__attribute_maker_outer.volume_per_tone_per_voice,
+                ),
+            ):
+                voices = tuple(
+                    old.Melody(
+                        old.Tone(tone.pitch, tone.delay, tone.delay, volume=volume)
+                        for tone, volume in zip(voice, volume_per_tone)
+                    )
+                    for voice, volume_per_tone in zip(voices, volume_per_voice)
+                )
+                voices_inner_and_outer.append(voices)
+
+            init_attributes.update(
+                self.make_natural_radio(
+                    voices_inner_and_outer[0],
+                    voices_inner_and_outer[1],
+                    self.__tempo_factor,
+                    gender,
+                    make_envelope=True,
+                    samples=radio_samples,
+                    n_changes=radio_n_changes,
+                    crossfade_duration=radio_crossfade_duration,
+                    anticipation_time=self.__anticipation_time,
+                    overlaying_time=self.__overlaying_time,
+                    average_volume=radio_average_volume,
+                    min_volume=radio_min_volume,
+                    max_volume=radio_max_volume,
+                    shadow_time=radio_shadow_time,
+                )
+            )
 
         # make speech voices
         if include_speech:
@@ -126,21 +223,11 @@ class ThreeVoiceCP(MU.Segment):
     def make_voices(self) -> dict:
         init_attributes = {}
 
-        voices = tuple(
-            old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
-            for vox in self.__counterpoint_result[0]
-        )
-        attribute_maker = pteqer.AttributeMaker(
-            voices,
-            metricity_per_beat=self.__weight_per_beat,
-            max_spectrum_profile_change=10,
-            dynamic_range=(0.35, 0.85),
-        )
         for v_idx, voice, spectrum_profile_per_tone, volume_per_tone in zip(
             range(len(self.__counterpoint_result[0])),
             self.__counterpoint_result[0],
-            attribute_maker.spectrum_profile_per_tone,
-            attribute_maker.volume_per_tone_per_voice,
+            self.__attribute_maker_inner.spectrum_profile_per_tone,
+            self.__attribute_maker_inner.volume_per_tone_per_voice,
         ):
             sound_engine = pteq.PianoteqVoice(
                 self.__tempo_factor,
@@ -228,14 +315,15 @@ class ThreeVoiceCP(MU.Segment):
         crossfade_duration: float,
         anticipation_time: float,
         overlaying_time: float,
+        average_volume: float,
         min_volume: float,
         max_volume: float,
         shadow_time: float,
     ) -> dict:
-        # TODO(make voices, also add volume argument to diva voices)
-        # TODO(detect which loudspeaker is having which sample at which moment)
+        n_samples = len(samples)
 
-        assert len(samples) in (1, 2, 3)
+        # make sure there are at least one sample but not more than three
+        assert n_samples in (1, 2, 3)
 
         # are those asserts here really necessary?
         assert shadow_time <= anticipation_time
@@ -250,14 +338,68 @@ class ThreeVoiceCP(MU.Segment):
         if not gender:
             inner_voices, outer_voices = outer_voices, inner_voices
 
+        delay_volume_pairs_per_voice = tuple(
+            tuple(
+                (delay, tone.volume)
+                for delay, tone in zip(
+                    melody.delay.stretch(tempo_factor).convert2absolute(), melody
+                )
+            )
+            for melody in voices_main
+        )
+
+        delay_volume_pairs = functools.reduce(
+            operator.add, delay_volume_pairs_per_voice
+        )
+        sorted_delay_volume_pairs = sorted(
+            delay_volume_pairs, key=operator.itemgetter(1), reverse=True
+        )
+
+        change_positions = [0]
+        for delay_volume_pair in sorted_delay_volume_pairs:
+            if len(change_positions) - 1 == n_changes:
+                break
+            position = delay_volume_pair[0]
+            if position not in change_positions:
+                change_positions.append(position)
+
+        change_positions = sorted(change_positions)
+
+        sample_distributer_cycle = itertools.cycle(
+            (
+                # for one sample
+                (CyclicPermutation((0,) * 6),),
+                # for two samples
+                (CyclicPermutation((0, 1) * 3), CyclicPermutation((0, 0, 1, 0, 1, 1))),
+                # for three samples
+                (
+                    CyclicPermutation((0, 1, 2, 2, 1, 0)),
+                    CyclicPermutation((0, 1, 2, 0, 1, 2)),
+                ),
+            )[n_samples - 1]
+        )
+
+        sample_distribution_per_change = tuple(
+            next(next(sample_distributer_cycle)) for n in range(n_changes + 1)
+        )
+        sample_per_change_per_voice = tuple(
+            tuple(samples[sample_idx] for sample_idx in voice)
+            for voice in zip(*sample_distribution_per_change)
+        )
+
         init_attributes = {}
 
         for voice_type, voices in enumerate((voices_main, voices_side)):
             for voice_idx, voice in enumerate(voices):
 
+                absolute_voice_idx = (inner_voices, outer_voices)[voice_type][voice_idx]
+
                 sound_engine = radio.RadioEngine(
                     voice,
+                    change_positions,
+                    sample_per_change_per_voice[absolute_voice_idx],
                     make_envelope,
+                    average_volume,
                     min_volume,
                     max_volume,
                     duration,
@@ -270,9 +412,7 @@ class ThreeVoiceCP(MU.Segment):
                     release_duration=0.35,
                 )
 
-                voice_name = "natural_radio_{}".format(
-                    (inner_voices, outer_voices)[voice_idx]
-                )
+                voice_name = "natural_radio_{}".format(absolute_voice_idx)
 
                 init_attributes.update(
                     {
