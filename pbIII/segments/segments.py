@@ -31,9 +31,9 @@ class PBIII_Segment(MU.Segment):
 class Silence(PBIII_Segment):
     """Segment class that generates only silence, for rests etc."""
 
-    def __init__(self, name: str, duration: float):
+    def __init__(self, name: str, duration: float, start: float = 0):
         self.__duration = duration
-        super().__init__(name, **{})
+        super().__init__(name, start=start, **{})
 
     @property
     def duration(self):
@@ -69,6 +69,8 @@ class ThreeVoiceCP(PBIII_Segment):
     def __init__(
         self,
         name: str,
+        rhythms_maker=None,
+        start: float = 0,
         group: tuple = (0, 0, 0),
         gender: bool = True,
         n_bars: int = 1,
@@ -87,12 +89,15 @@ class ThreeVoiceCP(PBIII_Segment):
             "pbIII/samples/radio/UK/4.wav",
             "pbIII/samples/radio/Italy/2.wav",
         ),
-        radio_average_volume: float = 0.25,
-        radio_min_volume: float = 0.6,
+        radio_make_envelope: bool = True,
+        radio_average_volume: float = 0.3,
+        radio_min_volume: float = 0.65,
         radio_max_volume: float = 1,
-        radio_n_changes: int = 3,
+        radio_n_changes: int = 5,
         radio_crossfade_duration: float = 0.5,
-        radio_shadow_time: float = 0.15,
+        radio_shadow_time: float = 0.175,
+        cp_constraints_harmonic: tuple = tuple([]),
+        cp_constraints_interpolation: tuple = tuple([]),
     ) -> None:
         self.__n_bars = n_bars
         self.__gender_code = ("N", "P")[int(gender)]
@@ -103,14 +108,17 @@ class ThreeVoiceCP(PBIII_Segment):
         self.__anticipation_time = anticipation_time
         self.__overlaying_time = overlaying_time
 
-        rhythms = polyrhythms.Polyrhythm(
-            *tuple(
-                binr.Compound.from_euclid(
-                    metrical_prime * self.__n_bars, 7 * self.__n_bars
+        if rhythms_maker is None:
+
+            def rhythms_maker(self) -> tuple:
+                return tuple(
+                    binr.Compound.from_euclid(
+                        metrical_prime * self.__n_bars, 7 * self.__n_bars
+                    )
+                    for metrical_prime in self.__metrical_numbers
                 )
-                for metrical_prime in self.__metrical_numbers
-            )
-        ).transformed_rhythms
+
+        rhythms = polyrhythms.Polyrhythm(*rhythms_maker(self)).transformed_rhythms
 
         self.__bar_size = int(sum(rhythms[0])) // n_bars
         self.__weight_per_beat_for_one_bar = self.make_weight_per_beat_for_one_bar(
@@ -125,7 +133,11 @@ class ThreeVoiceCP(PBIII_Segment):
         )
 
         cp = self.counterpoint_class(
-            rhythms, gender=gender, weight_per_beat=self.__weight_per_beat
+            rhythms,
+            gender=gender,
+            weight_per_beat=self.__weight_per_beat,
+            constraints_harmonic_resolution=cp_constraints_harmonic,
+            constraints_added_pitches=cp_constraints_interpolation,
         )
         self.__counterpoint_result = cp(
             *globals.MALE_SOIL.harmonic_primes_per_bar[self.__bar_number]
@@ -197,7 +209,7 @@ class ThreeVoiceCP(PBIII_Segment):
                     voices_inner_and_outer[1],
                     self.__tempo_factor,
                     gender,
-                    make_envelope=True,
+                    make_envelope=radio_make_envelope,
                     samples=radio_samples,
                     n_changes=radio_n_changes,
                     crossfade_duration=radio_crossfade_duration,
@@ -214,7 +226,7 @@ class ThreeVoiceCP(PBIII_Segment):
         if include_speech:
             init_attributes.update(self.make_speech())
 
-        super().__init__(name, **init_attributes)
+        super().__init__(name=name, start=start, **init_attributes)
 
     @property
     def duration(self) -> float:
@@ -470,3 +482,21 @@ class ThreeVoiceCP(PBIII_Segment):
             )
             diva = midiplug.Diva(diva_sequence)
             diva.export("{}/diva{}{}.mid".format(path, self.__gender_code, v_idx))
+
+
+class Chord(ThreeVoiceCP):
+    def __init__(
+        self, name: str, chord: globals.BLUEPRINT_HARMONIES["A"][0], **kwargs
+    ):
+        def rhythms_maker(self) -> tuple:
+            return tuple(
+                binr.Compound.from_euclid(
+                    metrical_prime * self.__n_bars, 1
+                )
+                for metrical_prime in self.__metrical_numbers
+            )
+
+        if "rhythms_maker" not in kwargs:
+            kwargs.update({"rhythms_maker": rhythms_maker})
+
+        super().__init__(name=name, **kwargs)

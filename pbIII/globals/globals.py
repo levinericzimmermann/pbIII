@@ -188,9 +188,9 @@ BLUEPRINT_HARMONIES = {
 
 
 # volume for stereo mixdown
-GLITTER_VOLUME = 0.05
+GLITTER_VOLUME = 0.0675
 VOICE_VOLUME = 1.6
-DIVA_VOLUME = 0.35
+DIVA_VOLUME = 0.3
 NATURAL_RADIO_VOLUME = 0.2
 SPEECH_VOLUME = 0.2
 
@@ -212,11 +212,11 @@ PBIII_ORCHESTRATION = MU.Orchestration(
     MU.Track("voiceN2", VOICE_VOLUME, 0.2),
     # diva voices
     MU.Track("divaP0", DIVA_VOLUME, 0.6),
-    MU.Track("divaP1", DIVA_VOLUME * 0.7, 1),
-    MU.Track("divaP2", DIVA_VOLUME * 0.4, 0.2),
+    MU.Track("divaP1", DIVA_VOLUME * 0.8, 1),
+    MU.Track("divaP2", DIVA_VOLUME * 0.5, 0.2),
     MU.Track("divaN0", DIVA_VOLUME, 0),
-    MU.Track("divaN1", DIVA_VOLUME * 0.7, 0.4),
-    MU.Track("divaN2", DIVA_VOLUME * 0.4, 0.8),
+    MU.Track("divaN1", DIVA_VOLUME * 0.8, 0.4),
+    MU.Track("divaN2", DIVA_VOLUME * 0.5, 0.8),
     # common harmonics between two voices
     MU.Track("glitterP01", GLITTER_VOLUME, 0.2),
     MU.Track("glitterP02", GLITTER_VOLUME, 0.4),

@@ -4,10 +4,10 @@ setup(
     name="pbIII",
     version="0.0.001",
     license="GPL",
-    description="",
+    description="pbIII is an audio installation for 9 radios",
     author="Levin Eric Zimmermann",
     author_email="levin-eric.zimmermann@folkwang-uni.de",
-    url="https://github.com/uummoo/pbII",
+    url="https://github.com/levinericzimmermann/pbII",
     packages=[
         "pbIII",
         "pbIII.fragments",

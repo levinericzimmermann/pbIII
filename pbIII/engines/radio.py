@@ -174,6 +174,9 @@ class RadioEngine(synthesis.BasedCsoundEngine):
                 wrap = 0
 
             else:
+                # TODO(does this potentially create clicks? when looping
+                # through the file and there isn't any particular envelope for
+                # this case?)
                 skip_time = 0
                 wrap = 1
 
