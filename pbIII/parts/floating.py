@@ -1,0 +1,187 @@
+from mutools import counterpoint
+
+from pbIII.engines import pteq
+from pbIII.engines import speech
+from pbIII.globals import globals
+from pbIII.segments import segments
+
+GROUP0 = 4
+GENDER = False
+
+PART = (
+    segments.ThreeVoiceCP(
+        "part0_0",
+        group=(GROUP0, 1, 0),
+        gender=GENDER,
+        n_bars=5,
+        duration_per_bar=20,
+        dynamic_range_of_voices=(0.1, 0.7),
+        anticipation_time=1,
+        overlaying_time=1,
+        cp_constraints_harmonic=(
+            counterpoint.constraints.HR_forbid_too_empty_harmonies(1),
+        ),
+        pteq_engine_per_voice=(
+            pteq.mk_dreamy_pte(),
+            pteq.mk_dreamy_pte(),
+            pteq.mk_dreamy_pte(),
+        ),
+        tracks2ignore=("voice0", "voice2"),
+        speech_init_attributes={
+            "voice0": {
+                "start": 1.25,
+                "duration": 40,
+                "sound_engine": speech.BrokenRadio(
+                    ("pbIII/samples/speech/sliced/fisher/0/",),
+                    duration=40,
+                    volume=0.1,
+                    activity_lv_per_effect={
+                        "original": 4,
+                        "noise": 2,
+                        "chenlee": 1,
+                        "lorenz": 1,
+                        "harmonizer": 9,
+                        "ringmodulation": 3,
+                    },
+                ),
+            },
+            "voice2": {
+                "start": 1.4,
+                "duration": 35,
+                "sound_engine": speech.BrokenRadio(
+                    ("pbIII/samples/speech/sliced/fisher/0/",),
+                    duration=35,
+                    volume=0.1,
+                    activity_lv_per_effect={
+                        "original": 9,
+                        "chenlee": 1,
+                        "lorenz": 2,
+                        "harmonizer": 3,
+                        "ringmodulation": 6,
+                    },
+                ),
+            },
+        },
+        include_natural_radio=False,
+    ),
+    segments.Chord(
+        "chordTEST_pre",
+        group=(GROUP0, 0, 2),
+        dynamic_range_of_voices=(0.1, 0.4),
+        chord=globals.BLUEPRINT_HARMONIES["C"][0],
+        start=0.4,
+        gender=GENDER,
+        n_bars=1,
+        duration_per_bar=5,
+        anticipation_time=0.75,
+        overlaying_time=0.5,
+        include_diva=False,
+    ),
+    segments.Chord(
+        "chordTEST_pre2",
+        chord=globals.BLUEPRINT_HARMONIES["A"][0],
+        dynamic_range_of_voices=(0.1, 0.56),
+        group=(GROUP0, 1, 0),
+        start=-1,
+        gender=GENDER,
+        n_bars=1,
+        duration_per_bar=2.5,
+        anticipation_time=0.75,
+        overlaying_time=0.5,
+        include_diva=False,
+    ),
+    segments.ThreeVoiceCP(
+        "part0_1",
+        dynamic_range_of_voices=(0.1, 0.6),
+        pteq_engine_per_voice=(
+            pteq.mk_dreamy_pte(),
+            pteq.mk_dreamy_pte(),
+            pteq.mk_dreamy_pte(),
+        ),
+        group=(GROUP0, 1, 1),
+        start=0,
+        gender=GENDER,
+        n_bars=4,
+        duration_per_bar=20,
+        anticipation_time=0.5,
+        overlaying_time=0.5,
+        cp_constraints_harmonic=(
+            counterpoint.constraints.HR_forbid_too_empty_harmonies(1),
+        ),
+        # include_diva=False,
+        include_glitter=False,
+        include_natural_radio=False,
+    ),
+    segments.Chord(
+        "chordTEST",
+        chord=globals.BLUEPRINT_HARMONIES["C"][0],
+        dynamic_range_of_voices=(0.1, 0.6),
+        group=(GROUP0, 0, 1),
+        start=0.5,
+        gender=GENDER,
+        n_bars=1,
+        duration_per_bar=3,
+        anticipation_time=0.75,
+        overlaying_time=0.5,
+        include_diva=False,
+    ),
+    segments.Chord(
+        "chordTEST1",
+        chord=globals.BLUEPRINT_HARMONIES["B"][0],
+        group=(GROUP0, 2, 1),
+        dynamic_range_of_voices=(0.1, 0.6),
+        start=0,
+        gender=GENDER,
+        n_bars=1,
+        duration_per_bar=3,
+        anticipation_time=1,
+        overlaying_time=0.5,
+        include_diva=False,
+    ),
+    segments.Chord(
+        "chordTEST2",
+        chord=globals.BLUEPRINT_HARMONIES["A"][0],
+        dynamic_range_of_voices=(0.1, 0.6),
+        group=(GROUP0, 1, 1),
+        start=0,
+        gender=GENDER,
+        n_bars=1,
+        duration_per_bar=1,
+        anticipation_time=1,
+        overlaying_time=2,
+        include_diva=False,
+    ),
+    segments.ThreeVoiceCP(
+        "part0_2",
+        group=(GROUP0, 1, 2),
+        gender=GENDER,
+        start=6,
+        n_bars=3,
+        duration_per_bar=10,
+        anticipation_time=0.7,
+        overlaying_time=0.7,
+        include_voices=False,
+        include_diva=False,
+        radio_n_changes=2,
+        speech_init_attributes={
+            "voice1": {
+                "start": 1.25,
+                "duration": 30,
+                "sound_engine": speech.BrokenRadio(
+                    ("pbIII/samples/speech/sliced/weather_forecast/deutsch0/",),
+                    skip_n_samples_per_source=(1,),
+                    duration=30,
+                    volume=0.4,
+                    activity_lv_per_effect={
+                        "original": 4,
+                        "noise": 10,
+                        "chenlee": 6,
+                        "lorenz": 10,
+                        "filter": 10,
+                        "ringmodulation": 3,
+                    },
+                ),
+            }
+        },
+    ),
+)
