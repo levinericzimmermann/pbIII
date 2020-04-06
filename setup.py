@@ -12,6 +12,7 @@ setup(
         "pbIII",
         "pbIII.fragments",
         "pbIII.globals",
+        "pbIII.parts",
         "pbIII.segments",
     ],
     package_data={},
