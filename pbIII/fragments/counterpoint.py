@@ -11,6 +11,7 @@ class ThreeVoiceRhythmicCP(counterpoint.RhythmicCP):
     def __init__(
         self,
         rhythm_per_voice: tuple,
+        ambitus_maker,
         gender: bool = True,
         weight_per_beat=None,
         constraints_harmonic_resolution: tuple = tuple([]),
@@ -19,6 +20,7 @@ class ThreeVoiceRhythmicCP(counterpoint.RhythmicCP):
         super().__init__(
             self.mk_harmonies(gender),
             rhythm_per_voice,
+            ambitus_maker=ambitus_maker,
             weights_per_beat=weight_per_beat,
             constraints_harmonic_resolution=constraints_harmonic_resolution,
             constraints_added_pitches=constraints_added_pitches,
