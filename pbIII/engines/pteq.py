@@ -40,7 +40,9 @@ class __PianoteqVoice(synthesis.SoundEngine):
             rhythm *= self.__tempo_factor
 
             if pitch.is_empty:
-                tone = pteqer.mk_empty_attack(rhythm, 0.4)
+                tone = pteqer.mk_empty_attack(
+                    rhythm, next(self.empty_attack_dynamic_maker)
+                )
 
             else:
                 if is_not_dissonant_pitch:
@@ -58,6 +60,10 @@ class __PianoteqVoice(synthesis.SoundEngine):
                     else:
                         msg = "Unknown value type: {}.".format(type(value))
                         raise TypeError(msg)
+
+                if "pinch_harmonic_pedal" in parameters:
+                    if parameters["pinch_harmonic_pedal"]:
+                        pitch -= ji.r(2, 1)
 
                 tone = midiplug.PyteqTone(
                     ji.JIPitch(pitch, multiply=globals.CONCERT_PITCH),
@@ -88,6 +94,12 @@ __USED_PIANOTEQ_PARAMETER = {
     "hammer_hard_mezzo": 0.75,
     "hammer_hard_forte": 1.5,
     "strike_point": 1 / 8,
+    "pinch_harmonic_pedal": 0,
+    "reverb_switch": 0,
+    "rattle_pedale": 0,
+    "buff_stop_pedal": 0,
+    "blooming_energy": 0,
+    "blooming_inertia": 1,
 }
 
 
@@ -101,6 +113,7 @@ def mk_pianoteq_engine(
     fxp: str = __STANDARD_FXP,
     parameter_non_dissonant_pitches: dict = {},
     parameter_dissonant_pitches: dict = {},
+    empty_attack_dynamic_maker: infit.InfIt = infit.Uniform(0.2, 0.4),
 ) -> type:
 
     assert fxp is None or preset is None
@@ -121,6 +134,7 @@ def mk_pianoteq_engine(
         "fxp": fxp,
         "parameter_dissonant_pitches": parameter_dissonant_pitches,
         "parameter_non_dissonant_pitches": parameter_non_dissonant_pitches,
+        "empty_attack_dynamic_maker": empty_attack_dynamic_maker,
     }
     return type("PianoteqVoice", (__PianoteqVoice,), attributes)
 
@@ -167,21 +181,36 @@ def mk_dreamy_pte(
         preset=preset,
         fxp=fxp,
         parameter_non_dissonant_pitches={
-            "impedance": 3,
-            "cutoff": 2.7,
-            "q_factor": 0.2,
-            "string_length": 9,
-            "hammer_noise": 1,
+            "impedance": infit.Uniform(2.5, 3),
+            "cutoff": infit.Uniform(2.5, 3, seed=2),
+            "q_factor": infit.Uniform(0.2, 0.4, seed=2),
+            "direct_sound_duration": infit.Uniform(4, 5, seed=3),
+            "string_length": infit.Uniform(8, 10),
+            "sympathetic_resonance": infit.Uniform(2, 5),
+            "hammer_noise": infit.Uniform(0.2, 1.0, seed=10),
             "sustain_pedal": 1,
             "hammer_hard_piano": 0.4,
-            "hammer_hard_mezzo": 0.7,
-            "hammer_hard_forte": 1,
-            "strike_point": 1 / 8,
+            "hammer_hard_mezzo": 0.65,
+            "hammer_hard_forte": 0.885,
+            "strike_point": infit.Uniform(1 / 64, 1 / 8),
+            "pinch_harmonic_pedal": 0,
+            "buff_stop_pedal": 0,
+            "sound_speed": infit.Uniform(200, 500),
+            "blooming_energy": infit.Uniform(1.55, 2),
+            "blooming_inertia": infit.Uniform(1.55, 2.8),
         },
         parameter_dissonant_pitches={
-            "hammer_hard_piano": 0.3,
-            "hammer_hard_mezzo": 0.5,
-            "hammer_hard_forte": 0.7,
+            "hammer_hard_piano": 0.25,
+            "hammer_hard_mezzo": 0.525,
+            "hammer_hard_forte": 0.75,
+            "sound_speed": infit.Uniform(200, 500),
+            "sympathetic_resonance": infit.Uniform(1, 2),
+            "pinch_harmonic_pedal": infit.Cycle((1, 0, 1)),
+            "buff_stop_pedal": infit.Cycle((0, 1, 0, 1, 0)),
+            "strike_point": infit.Uniform(1 / 64, 1 / 32),
+            "q_factor": infit.Uniform(0.2, 1),
+            "hammer_noise": infit.Uniform(0.65, 1.25, seed=1000),
+            "blooming_energy": 0,
         },
         *args,
         **kwargs,

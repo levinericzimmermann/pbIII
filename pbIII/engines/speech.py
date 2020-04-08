@@ -1,13 +1,13 @@
-import itertools
 import operator
 import os
 
 import natsort
 
+from mu.utils import activity_levels
+from mu.utils import infit
 from mu.utils import interpolations
 from mu.utils import tools
 
-from mutools import activity_levels
 from mutools import synthesis
 
 
@@ -152,15 +152,15 @@ class BrokenRadio(synthesis.PyoEngine):
         ),
         duration: float = 10,
         interlocking: str = "parallel",
-        pause_per_event=itertools.cycle((0,)),
-        filter_freq_maker=itertools.cycle((200,)),
-        filter_q_maker=itertools.cycle((0.5,)),
-        rm_freq_maker=itertools.cycle((700,)),
-        transpo_maker=itertools.cycle((-3, -1, -2, -5)),
-        chenlee_chaos_maker=itertools.cycle((0.75, 1, 0.5, 0.8)),
-        chenlee_pitch_maker=itertools.cycle((0.5, 0.75, 0.66)),
-        lorenz_chaos_maker=itertools.cycle((0.5, 0.7, 0.6)),
-        lorenz_pitch_maker=itertools.cycle((0.5, 0.6, 0.55)),
+        pause_per_event: infit.InfIt = infit.Cycle((0,)),
+        filter_freq_maker: infit.InfIt = infit.Cycle((200,)),
+        filter_q_maker: infit.InfIt = infit.Cycle((0.5,)),
+        rm_freq_maker: infit.InfIt = infit.Cycle((700,)),
+        transpo_maker: infit.InfIt = infit.Cycle((-3, -1, -2, -5)),
+        chenlee_chaos_maker: infit.InfIt = infit.Cycle((0.75, 1, 0.5, 0.8)),
+        chenlee_pitch_maker: infit.InfIt = infit.Cycle((0.5, 0.75, 0.66)),
+        lorenz_chaos_maker: infit.InfIt = infit.Cycle((0.5, 0.7, 0.6)),
+        lorenz_pitch_maker: infit.InfIt = infit.Cycle((0.5, 0.6, 0.55)),
     ) -> None:
 
         super().__init__()
@@ -169,7 +169,7 @@ class BrokenRadio(synthesis.PyoEngine):
             order_per_source = tuple("original" for i in sources)
 
         if source_decider is None:
-            source_decider = itertools.cycle(range(len(sources)))
+            source_decider = infit.Cycle(range(len(sources)))
 
         if skip_n_samples_per_source is None:
             skip_n_samples_per_source = tuple(0 for i in sources)
@@ -197,7 +197,7 @@ class BrokenRadio(synthesis.PyoEngine):
                 activity_lv_per_effect.update({effect: 0})
 
             if effect not in level_per_effect:
-                level_per_effect.update({effect: itertools.cycle((1,))})
+                level_per_effect.update({effect: infit.Cycle((1,))})
 
         self.level_per_effect = level_per_effect
         self.activity_lv_per_effect = activity_lv_per_effect
@@ -211,26 +211,29 @@ class BrokenRadio(synthesis.PyoEngine):
         }
 
         if interlocking is "parallel":
-            self.maxima_n_events = max(len(paths) for paths in self.path_per_source)
+            self.maxima_n_events = min(len(paths) for paths in self.path_per_source)
         elif interlocking is "sequential":
             self.maxima_n_events = sum(len(paths) for paths in self.path_per_source)
         else:
             raise ValueError("Unknown interlocking: {}.".format(interlocking))
 
-        self.sample_key_per_event = tuple(
-            (next(self.source_decider), idx) for idx in range(self.maxima_n_events)
-        )
-
         if interlocking is "parallel":
-            self.sample_path_per_event = tuple(
-                self.path_per_source[source_idx][sample_idx]
-                for source_idx, sample_idx in self.sample_key_per_event
-            )
-        elif interlocking is "sequential":
-            self.sample_path_per_event = tools.euclidic_interlocking(
-                *self.path_per_source
+            self.sample_key_per_event = tuple(
+                (next(self.source_decider), idx) for idx in range(self.maxima_n_events)
             )
 
+        elif interlocking is "sequential":
+            self.sample_key_per_event = tools.euclidic_interlocking(
+                *tuple(
+                    tuple((idx, i) for i in range(len(source)))
+                    for idx, source in enumerate(self.path_per_source)
+                )
+            )
+
+        self.sample_path_per_event = tuple(
+            self.path_per_source[source_idx][sample_idx]
+            for source_idx, sample_idx in self.sample_key_per_event
+        )
         ig1 = operator.itemgetter(1)
         self.duration_per_sample = tuple(
             ig1(self.data_per_source[source_idx][sample_idx])

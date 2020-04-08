@@ -190,11 +190,11 @@ BLUEPRINT_HARMONIES = {
 # volume for stereo mixdown
 GLITTER_VOLUME = 0.0275
 VOICE_VOLUME = 1.6
-DIVA_VOLUME = 0.3
+DIVA_VOLUME = 0.28
 NATURAL_RADIO_VOLUME = 0.085
 SPEECH_VOLUME = 0.15
 
-GENERAL_FACTOR = 0.8
+GENERAL_FACTOR = 0.85
 
 GLITTER_VOLUME *= GENERAL_FACTOR
 VOICE_VOLUME *= GENERAL_FACTOR
@@ -204,11 +204,11 @@ SPEECH_VOLUME *= GENERAL_FACTOR
 
 PBIII_ORCHESTRATION = MU.Orchestration(
     # pianoteq voices
-    MU.Track("voiceP0", VOICE_VOLUME * 1.3, 0),
-    MU.Track("voiceP1", VOICE_VOLUME * 1.1, 0.4),
+    MU.Track("voiceP0", VOICE_VOLUME * 1.4, 0),
+    MU.Track("voiceP1", VOICE_VOLUME * 1.2, 0.4),
     MU.Track("voiceP2", VOICE_VOLUME, 0.8),
-    MU.Track("voiceN0", VOICE_VOLUME * 1.3, 0.6),
-    MU.Track("voiceN1", VOICE_VOLUME * 1.1, 1),
+    MU.Track("voiceN0", VOICE_VOLUME * 1.4, 0.6),
+    MU.Track("voiceN1", VOICE_VOLUME * 1.2, 1),
     MU.Track("voiceN2", VOICE_VOLUME, 0.2),
     # diva voices
     MU.Track("divaP0", DIVA_VOLUME, 0.6),

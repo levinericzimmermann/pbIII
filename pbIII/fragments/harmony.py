@@ -8,6 +8,7 @@ def find_harmony(
     use_main_harmony: bool = True,
     idx: int = 0,
     empty_voices: tuple = tuple([]),
+    gender: bool = True,
 ) -> tuple:
     harmony = globals.BLUEPRINT_HARMONIES[name]
     dissonant_pitches = harmony[-1]
@@ -19,4 +20,9 @@ def find_harmony(
             if vox_idx not in empty_voices
         )
     )
+
+    if not gender:
+        bp_harmony = bp_harmony.inverse()
+        dissonant_pitches = dissonant_pitches.inverse()
+
     return (bp_harmony, empty_voices, dissonant_pitches)

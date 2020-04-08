@@ -3,11 +3,14 @@ import itertools
 import operator
 
 from mu.mel import ji
+from mu.mel import mel
 from mu.midiplug import midiplug
 from mu.rhy import binr
 from mu.rhy import indispensability
 from mu.sco import old
+from mu.utils import infit
 from mu.utils import prime_factors
+from mu.utils import tools
 
 from mutools import ambitus
 from mutools import MU
@@ -17,6 +20,7 @@ from mutools import schillinger
 
 
 from pbIII.fragments import counterpoint
+from pbIII.fragments import harmony
 from pbIII.globals import globals
 
 from pbIII.engines import diva
@@ -71,7 +75,7 @@ class ThreeVoiceCP(PBIII_Segment):
         self,
         name: str,
         tracks2ignore=tuple([]),
-        rhythms_maker=None,
+        rhythm_maker=None,
         start: float = 0,
         group: tuple = (0, 0, 0),
         gender: bool = True,
@@ -85,6 +89,7 @@ class ThreeVoiceCP(PBIII_Segment):
         include_natural_radio: bool = True,
         dynamic_range_of_voices: tuple = (0.2, 0.95),
         max_spectrum_profile_change: int = 10,
+        glitter_include_dissonant_pitches: bool = True,
         radio_samples: tuple = (
             "pbIII/samples/radio/bielefeld/2.wav",
             "pbIII/samples/radio/UK/4.wav",
@@ -111,6 +116,7 @@ class ThreeVoiceCP(PBIII_Segment):
             pteq.mk_contrasting_pte(),
         ),
     ) -> None:
+
         self.__n_bars = n_bars
         self.__gender_code = ("N", "P")[int(gender)]
         self.__bar_number = globals.MALE_SOIL.detect_group_index(group)
@@ -121,9 +127,9 @@ class ThreeVoiceCP(PBIII_Segment):
         self.__overlaying_time = overlaying_time
         self.__pteq_engine_per_voice = pteq_engine_per_voice
 
-        if rhythms_maker is None:
+        if rhythm_maker is None:
 
-            def rhythms_maker(self) -> tuple:
+            def rhythm_maker(self) -> tuple:
                 return tuple(
                     binr.Compound.from_euclid(
                         metrical_prime * self.__n_bars, 7 * self.__n_bars
@@ -131,7 +137,7 @@ class ThreeVoiceCP(PBIII_Segment):
                     for metrical_prime in self.__metrical_numbers
                 )
 
-        rhythms = polyrhythms.Polyrhythm(*rhythms_maker(self)).transformed_rhythms
+        rhythms = polyrhythms.Polyrhythm(*rhythm_maker(self)).transformed_rhythms
 
         self.__bar_size = int(sum(rhythms[0])) // n_bars
         self.__weight_per_beat_for_one_bar = self.make_weight_per_beat_for_one_bar(
@@ -152,6 +158,7 @@ class ThreeVoiceCP(PBIII_Segment):
             constraints_harmonic_resolution=cp_constraints_harmonic,
             constraints_added_pitches=cp_constraints_interpolation,
             ambitus_maker=ambitus_maker,
+            start_harmony=start_harmony,
         )
         self.__counterpoint_result = cp(
             *globals.MALE_SOIL.harmonic_primes_per_bar[self.__bar_number]
@@ -193,7 +200,9 @@ class ThreeVoiceCP(PBIII_Segment):
 
         # make glitter voices
         if include_glitter:
-            init_attributes.update(self.make_glitter_voices())
+            init_attributes.update(
+                self.make_glitter_voices(glitter_include_dissonant_pitches)
+            )
 
         # make natural radio voices
         if include_natural_radio:
@@ -304,12 +313,16 @@ class ThreeVoiceCP(PBIII_Segment):
 
         return init_attributes
 
-    def make_glitter_voices(self) -> dict:
+    def make_glitter_voices(self, include_dissonant_pitches: bool) -> dict:
         init_attributes = {}
+        if include_dissonant_pitches:
+            voice_base = self.__counterpoint_result[0]
+        else:
+            voice_base = self.__counterpoint_result[1]
+
         voices = tuple(
             old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
-            # for vox in self.__counterpoint_result[1]
-            for vox in self.__counterpoint_result[0]
+            for vox in voice_base
         )
         glitter_duration = self.__duration_per_voice + self.__anticipation_time
         glitter_duration += self.__overlaying_time
@@ -508,13 +521,8 @@ class ThreeVoiceCP(PBIII_Segment):
 
 
 class Chord(ThreeVoiceCP):
-    def __init__(
-        self,
-        name: str,
-        chord: ji.BlueprintHarmony = globals.BLUEPRINT_HARMONIES["A"][0],
-        **kwargs
-    ):
-        def rhythms_maker(self) -> tuple:
+    def __init__(self, name: str, chord: harmony.find_harmony(), **kwargs):
+        def rhythm_maker(self) -> tuple:
             return tuple(
                 binr.Compound.from_euclid(
                     metrical_prime * self._ThreeVoiceCP__n_bars, 1
@@ -522,7 +530,143 @@ class Chord(ThreeVoiceCP):
                 for metrical_prime in self._ThreeVoiceCP__metrical_numbers
             )
 
-        if "rhythms_maker" not in kwargs:
-            kwargs.update({"rhythms_maker": rhythms_maker})
+        if "rhythm_maker" not in kwargs:
+            kwargs.update({"rhythm_maker": rhythm_maker})
 
-        super().__init__(name=name, **kwargs)
+        super().__init__(name=name, start_harmony=chord, **kwargs)
+
+
+class DensityBasedThreeVoiceCP(ThreeVoiceCP):
+    def __init__(
+        self,
+        name: str,
+        density_per_voice: tuple = (1.0, 1.0, 1.0),
+        rhythmic_function: str = "barlow",
+        curve_per_voice: tuple = ((0, 0.5, 0.5, 0), (0, 0.5, 0.5, 0), (0, 0.5, 0.5, 0)),
+        distribution_function_for_first_attack_per_bar: infit.InfIt = infit.Cycle(
+            ((0, 1), (0, 2), (1, 2))
+        ),
+        *args,
+        **kwargs
+    ):
+        def rhythm_maker(self) -> tuple:
+            n_bars = self._ThreeVoiceCP__n_bars
+            # for first attack every voice should have a theoretical attack
+            # (rests are explicitly controlled through the start_harmony argument)
+            distribution_for_first_attack_per_bar = ((0, 1, 2),)
+            distribution_for_first_attack_per_bar += tuple(
+                next(distribution_function_for_first_attack_per_bar)
+                for i in range(n_bars - 1)
+            )
+            rhythm_per_voice = []
+            max_attacks_per_bar = min(globals.MALE_SOIL.metric_primes)
+            for voice_idx, metrical_prime, density, curve in zip(
+                range(3),
+                self._ThreeVoiceCP__metrical_numbers,
+                density_per_voice,
+                curve_per_voice,
+            ):
+
+                rhythm = []
+
+                # if density between 0 and 1 understand as percentage
+                # for density 1 only understand it as percentage if type is
+                # float
+                if (density >= 0 and density < 1) or (
+                    density == 1 and type(density) is float
+                ):
+                    n_attacks_per_bar = int(density * max_attacks_per_bar)
+
+                # else use it as an absolute number
+                else:
+                    assert density <= max_attacks_per_bar
+                    n_attacks_per_bar = int(density)
+
+                for (
+                    distribution_for_first_attack
+                ) in distribution_for_first_attack_per_bar:
+                    has_first_attack = voice_idx in distribution_for_first_attack
+                    n_attacks = n_attacks_per_bar + has_first_attack
+
+                    if rhythmic_function is "euclid":
+                        current_rhythm = tools.euclid(metrical_prime, n_attacks)
+
+                    elif rhythmic_function is "barlow":
+                        if metrical_prime == 10:
+                            divided = (2, 5)
+                        else:
+                            divided = tuple(prime_factors.factorise(metrical_prime))
+
+                        ranking = indispensability.bar_indispensability2indices(
+                            indispensability.indispensability_for_bar(divided)
+                        )
+                        choosen_attacks = sorted(ranking[:n_attacks])
+                        current_rhythm = tuple(
+                            b - a
+                            for a, b in zip(
+                                choosen_attacks, choosen_attacks[1:] + [metrical_prime]
+                            )
+                        )
+
+                    else:
+                        msg = "Unknown rhythmic function {}.".format(rhythmic_function)
+                        raise NotImplementedError(msg)
+
+                    if not has_first_attack:
+                        rhythm[-1] += current_rhythm[0]
+                        current_rhythm = current_rhythm[1:]
+
+                    rhythm.extend(current_rhythm)
+
+                rhythm_per_voice.append(binr.Compound(rhythm))
+
+            return tuple(rhythm_per_voice)
+
+        def constraint_AP_remove_non_relevant_pitches(
+            voice_idx: int, data: tuple
+        ) -> tuple:
+            pitches, rhythm, is_not_dissonant_pitch = data
+            n_tones = len(pitches)
+
+            curve = curve_per_voice[voice_idx]
+            curve_summed = sum(curve)
+            curve_percentage = tuple(item / curve_summed for item in curve)
+            n_attacks_per_curve_part = tools.round_percentage(curve_percentage, n_tones)
+            is_attack_allowed = list(
+                functools.reduce(
+                    operator.add,
+                    tuple(
+                        tools.not_fibonacci_transition(s0, s1, s2, s3)
+                        for s0, s1, s2, s3 in (
+                            n_attacks_per_curve_part[:2] + (0, 1),
+                            n_attacks_per_curve_part[2:] + (1, 0),
+                        )
+                    ),
+                )
+            )
+
+            is_attack_allowed[0] = 1
+
+            pitches = tuple(
+                p if is_allowed else mel.TheEmptyPitch
+                for is_allowed, p in zip(is_attack_allowed, pitches)
+            )
+
+            return (pitches, rhythm, is_not_dissonant_pitch)
+
+        if "rhythm_maker" not in kwargs:
+            kwargs.update({"rhythm_maker": rhythm_maker})
+
+        kwarg_name = "cp_constraints_interpolation"
+        if kwarg_name in kwargs:
+            kwargs.update(
+                {
+                    kwarg_name: kwargs[kwarg_name].extend(
+                        (constraint_AP_remove_non_relevant_pitches,)
+                    )
+                }
+            )
+        else:
+            kwargs.update({kwarg_name: (constraint_AP_remove_non_relevant_pitches,)})
+
+        super().__init__(name=name, *args, **kwargs)
