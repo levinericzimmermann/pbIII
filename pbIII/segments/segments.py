@@ -659,13 +659,10 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
 
         kwarg_name = "cp_constraints_interpolation"
         if kwarg_name in kwargs:
-            kwargs.update(
-                {
-                    kwarg_name: kwargs[kwarg_name].extend(
-                        (constraint_AP_remove_non_relevant_pitches,)
-                    )
-                }
+            new_constraints_AP = tuple(kwargs[kwarg_name]) + (
+                constraint_AP_remove_non_relevant_pitches,
             )
+            kwargs.update({kwarg_name: new_constraints_AP})
         else:
             kwargs.update({kwarg_name: (constraint_AP_remove_non_relevant_pitches,)})
 
