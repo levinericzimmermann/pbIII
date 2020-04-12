@@ -8,6 +8,9 @@ from mu.utils import tools
 
 from pbIII.globals import globals
 
+# STANDARD_MODULATOR = "pbIII/samples/speech/fisher/raw/"
+# STANDARD_MODULATOR += "KodwoEshunFisherMemorialLectureMono.wav"
+
 
 class GlitterEngine(synthesis.BasedCsoundEngine):
     def __init__(
@@ -21,7 +24,10 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
         max_harmonic: int = 32,
         attack_duration: float = 0.5,
         release_duration: float = 0.5,
+        modulator: str = "randomi",
+        # modulator: str = STANDARD_MODULATOR,
     ) -> None:
+        self.__modulator = modulator
         self.harmonic_melodies = self.make_melodies(
             voice0, voice1, n_voices, max_harmonic
         )
@@ -49,12 +55,36 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
         envelope_line += r"{0}, 1, p3 - {0} - {1}, 1, {1}, 0".format(
             self.__attack_duration, self.__release_duration
         )
+        if self.__modulator is "lfo":
+            modulator_line = "aRandom randh 10, 30\n"
+            modulator_line += r"aModulator lfo 1, aRandom + 3"
+
+        elif self.__modulator is "randomi":
+            modulator_line = "kMetaModulator randomi 4, 20, 4\n"
+            modulator_line += "aModulator randomi -1, 1, kMetaModulator"
+
+        elif self.__modulator is "randomh":
+            modulator_line = "kMetaModulator randomi 4, 20, 4\n"
+            modulator_line += "aModulator randomh -1, 1, kMetaModulator"
+
+        elif self.__modulator is None:
+            modulator_line = "aModulator = 1"
+
+        elif self.__modulator[-4:] == r".wav":
+            modulator_line = 'aModulator diskin2 "{}", 1, 0, 1, 6, 4'.format(
+                self.__modulator
+            )
+
+        else:
+            msg = "Unknown modulator {}".format(self.__modulator)
+            raise NotImplementedError(msg)
+
         out_line_sine = "out asig * aEnv * 0.3"
         out_line = "out asig * aEnv * 0.15"
         endin_line = r"endin"
 
         lines = [
-            r"0dbfs=1",
+            r"0dbfs=1.25",
             r"giSine ftgen 0, 0, 2^10, 10, 1",
             r"giSaw ftgen 0, 0, 2^10, 10, 1, 1/2, 1/3, 1/4, 1/5, 1/6, 1/7, 1/8, 1/9",
             r"giSquare ftgen 0, 0, 2^10, 10, 1, 0, 1/3, 0, 1/5, 0, 1/7, 0, 1/9",
@@ -65,7 +95,12 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
             ("giSine", "giSaw", "giSquare", "giTri")
         ):
             lines.append("instr {}".format(instr_idx + 1))
-            lines.append(r"asig poscil3 p5, p4, {}".format(ftable_name))
+            lines.append(modulator_line)
+            lines.append(
+                r"asig poscil3 p5 * ((aModulator + 1) * 0.5), p4, {}".format(
+                    ftable_name
+                )
+            )
             lines.append(envelope_line)
             if instr_idx == 0:
                 lines.append(out_line_sine)

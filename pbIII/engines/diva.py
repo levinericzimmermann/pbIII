@@ -3,8 +3,14 @@ from mutools import synthesis
 from mu.mel import ji
 from mu.rhy import binr
 from mu.sco import old
+from mu.utils import infit
+from mu.utils import interpolations
+
+from mu.midiplug import midiplug
 
 import pyo64 as pyo
+
+import numbers
 
 from pbIII.globals import globals
 
@@ -46,3 +52,119 @@ class DivaSimulation(synthesis.SineMelodyEngine):
                 ).out(dur=self.dur + 4)
 
         return PhasorPlayer
+
+
+class DivaMidiEngine(synthesis.SoundEngine):
+    def __init__(self, voice: tuple, tempo_factor: float, **kwargs):
+        self.__init_arguments = self.make_init_arguments()
+        self.__diva_sequence = self.make_diva_sequence(voice, tempo_factor)
+
+    @property
+    def _init_arguments(self) -> dict:
+        """define class specfic data here when inherting"""
+        return {}
+
+    @property
+    def init_arguments(self) -> dict:
+        return self.__init_arguments
+
+    def make_init_arguments(self) -> dict:
+        init_args = self._init_arguments
+        for arg in midiplug.DivaTone._init_args:
+            if arg not in init_args:
+                init_args[arg] = infit.Value(None)
+            else:
+                value = init_args[arg]
+
+                if not isinstance(value, infit.InfIt):
+                    if isinstance(value, numbers.Real) or isinstance(
+                        value, interpolations.InterpolationLine
+                    ):
+                        init_args[arg] = infit.Value(value)
+                    else:
+                        msg = "Unknown type '{}' for argument '{}'".format(
+                            type(value), arg
+                        )
+                        msg += " with value '{}'.".format(value)
+                        raise NotImplementedError(msg)
+
+        return init_args
+
+    def make_diva_sequence(self, voice: tuple, tempo_factor: float) -> tuple:
+        diva_sequence = []
+
+        for tone in voice:
+            delay = tone.delay * tempo_factor
+
+            if tone.pitch.is_empty:
+                dt = old.Rest(delay)
+
+            else:
+                div_synth_args = {
+                    arg: next(self.init_arguments[arg]) for arg in self.init_arguments
+                }
+                dt = midiplug.DivaTone(
+                    ji.JIPitch(tone.pitch, multiply=globals.CONCERT_PITCH),
+                    delay,
+                    delay,
+                    volume=tone.volume,
+                    **div_synth_args
+                )
+
+            diva_sequence.append(dt)
+
+        return tuple(diva_sequence)
+
+    def render(self, path: str) -> None:
+        """Only generate midi file and not wav file!"""
+
+        diva = midiplug.Diva(self.__diva_sequence)
+        diva.export(path)
+
+
+class FloatingDivaMidiEngine(DivaMidiEngine):
+    @property
+    def _init_arguments(self) -> dict:
+        """define class specfic data here when inherting"""
+        return {
+            "volume_curve": infit.Cycle(
+                (
+                    interpolations.Rising(),
+                    interpolations.FallingRising(),
+                    interpolations.Falling(),
+                    interpolations.RisingFalling(),
+                )
+            ),
+            "osc_noise_volume": infit.Uniform(0, 25),
+            "osc_mix": infit.Value(infit.Gaussian(50, 25)),
+            "osc_tune_mod_depth2": infit.Cycle(
+                (
+                    interpolations.Rising(0, 2),
+                    interpolations.Falling(-2, 2),
+                    infit.Gaussian(0, 1.5),
+                    interpolations.RisingFalling(-2, 2),
+                    interpolations.Falling(0, 2),
+                    0,
+                    interpolations.Rising(0, 1),
+                    infit.Uniform(-1, 1),
+                    interpolations.RisingFalling(-1, 1.5),
+                    interpolations.Falling(-2, -1),
+                    interpolations.Rising(-1, 0),
+                    0,
+                    infit.Gaussian(0, 2),
+                )
+            ),
+            "vcf1_freq_mod_depth": infit.Uniform(0, 30),
+            "vcf1_filter_fm": infit.Cycle(
+                (
+                    0,
+                    interpolations.Rising(0, 10),
+                    interpolations.FallingRising(-10, 10),
+                    interpolations.Falling(0, 10),
+                    0,
+                    interpolations.RisingFalling(0, 10),
+                    interpolations.Falling(-10, 0),
+                    interpolations.Rising(-10, 0),
+                )
+            ),
+        }

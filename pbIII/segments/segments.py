@@ -4,7 +4,6 @@ import operator
 
 from mu.mel import ji
 from mu.mel import mel
-from mu.midiplug import midiplug
 from mu.rhy import binr
 from mu.rhy import indispensability
 from mu.sco import old
@@ -90,6 +89,7 @@ class ThreeVoiceCP(PBIII_Segment):
         dynamic_range_of_voices: tuple = (0.2, 0.95),
         max_spectrum_profile_change: int = 10,
         glitter_include_dissonant_pitches: bool = True,
+        glitter_modulater_per_voice: tuple = ("randomi", "randomi", "randomi"),
         radio_samples: tuple = (
             "pbIII/samples/radio/bielefeld/2.wav",
             "pbIII/samples/radio/UK/4.wav",
@@ -115,17 +115,27 @@ class ThreeVoiceCP(PBIII_Segment):
             pteq.mk_contrasting_pte(),
             pteq.mk_contrasting_pte(),
         ),
+        diva_engine_per_voice: tuple = (
+            diva.FloatingDivaMidiEngine,
+            diva.FloatingDivaMidiEngine,
+            diva.FloatingDivaMidiEngine,
+        ),
+        # in case the user want to use her or his own metrical numbers
+        metrical_numbers: tuple = None,
     ) -> None:
 
         self.__n_bars = n_bars
         self.__gender_code = ("N", "P")[int(gender)]
         self.__bar_number = globals.MALE_SOIL.detect_group_index(group)
-        self.__metrical_numbers = globals.MALE_SOIL.metre_per_vox_per_bar[
-            self.__bar_number
-        ]
+        if metrical_numbers is None:
+            metrical_numbers = globals.MALE_SOIL.metre_per_vox_per_bar[
+                self.__bar_number
+            ]
+        self.__metrical_numbers = metrical_numbers
         self.__anticipation_time = anticipation_time
         self.__overlaying_time = overlaying_time
         self.__pteq_engine_per_voice = pteq_engine_per_voice
+        self.__diva_engine_per_voice = diva_engine_per_voice
 
         if rhythm_maker is None:
 
@@ -201,7 +211,9 @@ class ThreeVoiceCP(PBIII_Segment):
         # make glitter voices
         if include_glitter:
             init_attributes.update(
-                self.make_glitter_voices(glitter_include_dissonant_pitches)
+                self.make_glitter_voices(
+                    glitter_include_dissonant_pitches, glitter_modulater_per_voice
+                )
             )
 
         # make natural radio voices
@@ -313,7 +325,9 @@ class ThreeVoiceCP(PBIII_Segment):
 
         return init_attributes
 
-    def make_glitter_voices(self, include_dissonant_pitches: bool) -> dict:
+    def make_glitter_voices(
+        self, include_dissonant_pitches: bool, glitter_modulater_per_voice: tuple
+    ) -> dict:
         init_attributes = {}
         if include_dissonant_pitches:
             voice_base = self.__counterpoint_result[0]
@@ -327,13 +341,17 @@ class ThreeVoiceCP(PBIII_Segment):
         glitter_duration = self.__duration_per_voice + self.__anticipation_time
         glitter_duration += self.__overlaying_time
 
-        for combination in itertools.combinations(tuple(range(3)), 2):
+        for combination, modulator in zip(
+            tuple(itertools.combinations(tuple(range(3)), 2)),
+            glitter_modulater_per_voice,
+        ):
             sound_engine = glitter.GlitterEngine(
                 voices[combination[0]],
                 voices[combination[1]],
                 self.__tempo_factor,
                 anticipation_time=self.__anticipation_time,
                 overlaying_time=self.__overlaying_time,
+                modulator=modulator,
             )
 
             voice_name = "glitter{}{}{}".format(
@@ -501,23 +519,26 @@ class ThreeVoiceCP(PBIII_Segment):
     def convert_duration2factor(duration: float, bar_size: int) -> float:
         return duration / bar_size
 
-    def render(self, path: str) -> None:
-        super().render(path)
-
-        # make midi file render for DIVA
-        for v_idx, voice in enumerate(self.__counterpoint_result[1]):
-            diva_sequence = tuple(
-                midiplug.DivaTone(
-                    ji.JIPitch(pitch, multiply=globals.CONCERT_PITCH),
-                    delay * self.__tempo_factor,
-                    delay * self.__tempo_factor,
-                )
-                if pitch
-                else old.Rest(delay * self.__tempo_factor)
-                for pitch, delay in zip(*voice)
+    def _render_midi_diva(self, path: str) -> None:
+        for v_idx, voice, volume_per_tone, diva_engine in zip(
+            range(3),
+            self.__counterpoint_result[1],
+            self.__attribute_maker_outer.volume_per_tone_per_voice,
+            self.__diva_engine_per_voice,
+        ):
+            voice = tuple(
+                old.Tone(p, r, volume=v)
+                for p, r, v in zip(*(tuple(voice) + (volume_per_tone,)))
             )
-            diva = midiplug.Diva(diva_sequence)
-            diva.export("{}/diva{}{}.mid".format(path, self.__gender_code, v_idx))
+            diva_path = "{}/diva{}{}.mid".format(path, self.__gender_code, v_idx)
+            diva_engine(voice, self.__tempo_factor).render(diva_path)
+
+    def render(self, path: str) -> None:
+        # make midi file render for DIVA
+        self._render_midi_diva(path)
+
+        # make usual sound file render
+        super().render(path)
 
 
 class Chord(ThreeVoiceCP):
@@ -559,7 +580,7 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
                 for i in range(n_bars - 1)
             )
             rhythm_per_voice = []
-            max_attacks_per_bar = min(globals.MALE_SOIL.metric_primes)
+            max_attacks_per_bar = min(self._ThreeVoiceCP__metrical_numbers)
             for voice_idx, metrical_prime, density, curve in zip(
                 range(3),
                 self._ThreeVoiceCP__metrical_numbers,

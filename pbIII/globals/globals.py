@@ -1,4 +1,5 @@
 from mu.mel import ji
+from mu.mel import shortwriting as sw
 
 from mutools import MU
 
@@ -185,6 +186,54 @@ BLUEPRINT_HARMONIES = {
         ),
     ),
 }
+
+
+GREGORIAN_CHANT_SCALE = sw.translate2line("1 11+5- 5+ 11+ 3+ 13+ 7+")[0]
+# pitch that doesn't belong to usual harmonic / prime scale
+GREGORIAN_CHANT_SCALE_ADDITIONAL_PITCH = GREGORIAN_CHANT_SCALE[1]
+
+# gregorian chants copied from the book 'Chants of Church' by Monks of Solesmes
+# from 1952
+__CHANT_ANCTUS_SANCTUS_PITCH_DEGREES = (
+    "1 4 2 1 .6 .7 1 1",
+    "1 3 4 5 4 3 2 1",
+    "1 4 2 1 .6 .7 1 1",
+    "1 .6 .7 .6 .5 .7 2 1 .7 1 1",
+    "x 1 3 4 5 4 3 5 4",
+    "3 2 1 2 4 1 .6 .7 .6 .5 x",
+    ".7 2 1 .7 1 1",
+    "1 3 4 5 4 3 2 1 2 4 1 .6 .7 1 1",
+    "x 1 3 4 5 4 3 2 1",
+    "2 4 1 .6 .7 .6 .5 .7 2 1 .7 1 1 x",
+    "1 .6 .7 .6 .5 .7 2 1 .7 1 1",
+    "1 3 4 5 4 3 2 1 2 4 1 .6 .7 .6 .5 2 1 2 3 2 1",
+)
+__CHANT_ANCTUS_SANCTUS_RHYTHMS = (
+    (1, 1, 1, 1, 1, 1, 1, 2),
+    (1, 1, 1, 1, 1, 1, 1, 2),
+    (1, 1, 1, 1, 1, 1, 1, 2),
+    (1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2),
+    tuple(1 for i in range(8)) + (2,),
+    (1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1),
+    (1, 1, 1, 1, 1, 2),
+    tuple(1 for i in range(14)) + (2,),
+    tuple(1 for i in range(8)) + (2,),
+    (1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1),
+    (1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2),
+    tuple(1 for i in range(14)) + (2, 1, 1, 1, 1, 2, 2),
+)
+__CHANT_ANCTUS_SANCTUS_DECODEX = {
+    str(idx + 1): pitch for idx, pitch in enumerate(GREGORIAN_CHANT_SCALE)
+}
+CHANT_ANCTUS_SANCTUS_PHRASES = tuple(
+    (
+        sw.translate2line(pitch_degrees, decodex=__CHANT_ANCTUS_SANCTUS_DECODEX)[0],
+        rhythm,
+    )
+    for pitch_degrees, rhythm in zip(
+        __CHANT_ANCTUS_SANCTUS_PITCH_DEGREES, __CHANT_ANCTUS_SANCTUS_RHYTHMS
+    )
+)
 
 
 # volume for stereo mixdown
