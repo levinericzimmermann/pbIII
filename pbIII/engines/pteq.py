@@ -18,26 +18,54 @@ class __PianoteqVoice(synthesis.SoundEngine):
         is_not_dissonant_pitch_per_tone: tuple,
         dynamics: tuple,
         spectrum_profile_per_tone: tuple,
+        overlaying_time: float = 0,
+        ornamentation_glissando_activity_lv: int = 5,
+        ornamentation_glissando_cycle: infit.Cycle = infit.Cycle(
+            (0, 1, 2, 0, 1, 0, 1, 2, 1, 0, 2, 0, 1)
+        ),
     ):
 
         self.__tempo_factor = tempo_factor
         self.__pitches = pitches
+        self.__overlaying_time = overlaying_time
         self.__rhythm = rhythm
         self.__is_not_dissonant_pitch_per_tone = is_not_dissonant_pitch_per_tone
         self.__dynamics = dynamics
         self.__spectrum_profile_per_tone = spectrum_profile_per_tone
 
+    def make_ornamentation_glissando(self) -> tuple:
+        # unterscheide zwischen start und stop glissandi (am anfang oder am
+        # ende) jeweils in die tonrichtung des nächsten/vorherigen tones. erst
+        # wird entschieden, welche glissandi möglich sind (start und end -> end
+        # glissandi sind nur möglich wenn danach ein ton folgt, beide
+        # glissandi sind nur dann möglich, wenn der entsprechende ton noch
+        # keine glissandi hat dh. glissando_line argument noch 'None' ist), dann
+        # wird entschieden ob überhaupt ein glissando gespielt wird (activity
+        # level) und dann wird entschieden welches der beiden glissandi benutzt
+        # wird, oder ob sogar beide benutzt werden (0, 1, 2) [bzw wenn nur ein
+        # glissando möglich ist wird automatisch das genommen]. Dann wird
+        # herausgefunden was für ein cent wert die bewegung hat (uniform
+        # funktion, die entsprechend der tonhöhe des folgenden/vorherigen tones
+        # eingeschränkt wird). Dann wird herausgefunden wie lange das glissando
+        # dauert (gaussian, der aber geclipped wird wenn größer als die hälfte
+        # der dauer des tones ist). dann wird glissando dem klang hinzugefügt.
+        pass
+
+    def make_ornamentation_vibrato(self) -> tuple:
+        pass
+
     def render(self, path: str) -> None:
+        adapted_rhythms = [rhythm * self.__tempo_factor for rhythm in self.__rhythm]
+        adapted_rhythms[-1] += self.__overlaying_time
+
         sequence = []
         for pitch, rhythm, is_not_dissonant_pitch, spectrum_profile, volume in zip(
             self.__pitches,
-            self.__rhythm,
+            adapted_rhythms,
             self.__is_not_dissonant_pitch_per_tone,
             self.__spectrum_profile_per_tone,
             self.__dynamics,
         ):
-
-            rhythm *= self.__tempo_factor
 
             if pitch.is_empty:
                 tone = pteqer.mk_empty_attack(

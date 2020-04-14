@@ -210,19 +210,19 @@ class BrokenRadio(synthesis.PyoEngine):
             effect: activity_levels.ActivityLevel() for effect in self.__effects
         }
 
-        if interlocking is "parallel":
+        if interlocking == "parallel":
             self.maxima_n_events = min(len(paths) for paths in self.path_per_source)
-        elif interlocking is "sequential":
+        elif interlocking == "sequential":
             self.maxima_n_events = sum(len(paths) for paths in self.path_per_source)
         else:
             raise ValueError("Unknown interlocking: {}.".format(interlocking))
 
-        if interlocking is "parallel":
+        if interlocking == "parallel":
             self.sample_key_per_event = tuple(
                 (next(self.source_decider), idx) for idx in range(self.maxima_n_events)
             )
 
-        elif interlocking is "sequential":
+        elif interlocking == "sequential":
             self.sample_key_per_event = tools.euclidic_interlocking(
                 *tuple(
                     tuple((idx, i) for i in range(len(source)))
@@ -301,9 +301,9 @@ class BrokenRadio(synthesis.PyoEngine):
 
             all_files = natsort.natsorted(os.listdir(path))[skip_n_samples:]
 
-            if order is "reverse":
+            if order == "reverse":
                 all_files = tuple(reversed(all_files))
-            elif order is "shuffle":
+            elif order == "shuffle":
                 all_files = list(all_files)
                 random_shuffle.shuffle(all_files)
                 all_files = tuple(all_files)
@@ -412,5 +412,44 @@ class BrokenRadio(synthesis.PyoEngine):
             **lv_per_effect,
         )
         e.play()
+
+        self.server.start()
+
+
+class Sampler(synthesis.PyoEngine):
+    init_args = {"volume": 1, "skip_n_seconds": 0, "fadein": 0, "fadeout": 0}
+
+    def __init__(self, path: str, duration: float, **kwargs):
+        super().__init__()
+        self.__path = path
+        self.__duration = duration
+
+        for arg in self.init_args:
+            if arg not in kwargs:
+                kwargs.update({arg: self.init_args[arg]})
+
+        self.__init_args = kwargs
+
+    @property
+    def duration(self) -> float:
+        return self.__duration
+
+    @property
+    def path(self) -> str:
+        return self.__path
+
+    def copy(self) -> "Sampler":
+        return type(self)(self.path, self.duration, **self.__init_args)
+
+    def render(self, name: str) -> None:
+        self.server.recordOptions(
+            dur=self.duration, filename="{}.wav".format(name), sampletype=4
+        )
+
+        soundfile = synthesis.pyo.SndTable(self.path)
+        osc = synthesis.pyo.Osc(
+            soundfile, freq=soundfile.getRate(), interp=4, mul=self.__init_args["volume"]
+        )
+        osc.out()
 
         self.server.start()

@@ -1,3 +1,4 @@
+import abc
 import functools
 import itertools
 import operator
@@ -12,13 +13,14 @@ from mu.utils import prime_factors
 from mu.utils import tools
 
 from mutools import ambitus
+from mutools import counterpoint
 from mutools import MU
 from mutools import polyrhythms
 from mutools import pteqer
 from mutools import schillinger
 
 
-from pbIII.fragments import counterpoint
+# from pbIII.fragments import counterpoint
 from pbIII.fragments import harmony
 from pbIII.globals import globals
 
@@ -26,22 +28,6 @@ from pbIII.engines import diva
 from pbIII.engines import glitter
 from pbIII.engines import pteq
 from pbIII.engines import radio
-
-
-class PBIII_Segment(MU.Segment):
-    orchestration = globals.PBIII_ORCHESTRATION
-
-
-class Silence(PBIII_Segment):
-    """Segment class that generates only silence, for rests etc."""
-
-    def __init__(self, name: str, duration: float, start: float = 0):
-        self.__duration = duration
-        super().__init__(name, start=start, **{})
-
-    @property
-    def duration(self):
-        return self.__duration
 
 
 class CyclicPermutation(object):
@@ -62,13 +48,13 @@ class CyclicPermutation(object):
         return self.__pattern
 
 
-class ThreeVoiceCP(PBIII_Segment):
+class PBIII_Segment(MU.Segment):
     """General Segment class for Segments with counterpoint for 3 voices.
 
     More specific Segments could be generated through inheritance.
     """
 
-    counterpoint_class = counterpoint.ThreeVoiceRhythmicCP
+    orchestration = globals.PBIII_ORCHESTRATION
 
     def __init__(
         self,
@@ -88,6 +74,7 @@ class ThreeVoiceCP(PBIII_Segment):
         include_natural_radio: bool = True,
         dynamic_range_of_voices: tuple = (0.2, 0.95),
         max_spectrum_profile_change: int = 10,
+        voices_overlaying_time: float = 1,
         glitter_include_dissonant_pitches: bool = True,
         glitter_modulater_per_voice: tuple = ("randomi", "randomi", "randomi"),
         radio_samples: tuple = (
@@ -105,6 +92,7 @@ class ThreeVoiceCP(PBIII_Segment):
         radio_silent_channels: tuple = tuple([]),
         cp_constraints_harmonic: tuple = tuple([]),
         cp_constraints_interpolation: tuple = tuple([]),
+        cp_add_dissonant_pitches_to_nth_voice: tuple = (True, True, True),
         speech_init_attributes: dict = {},
         ambitus_maker: ambitus.AmbitusMaker = ambitus.SymmetricalRanges(
             ji.r(1, 1), ji.r(3, 1), ji.r(5, 4)
@@ -124,78 +112,75 @@ class ThreeVoiceCP(PBIII_Segment):
         metrical_numbers: tuple = None,
     ) -> None:
 
-        self.__n_bars = n_bars
-        self.__gender_code = ("N", "P")[int(gender)]
-        self.__bar_number = globals.MALE_SOIL.detect_group_index(group)
+        self._n_bars = n_bars
+        self._cp_constraints_interpolation = cp_constraints_interpolation
+        self._gender = gender
+        self._gender_code = ("N", "P")[int(gender)]
+        self._bar_number = globals.MALE_SOIL.detect_group_index(group)
         if metrical_numbers is None:
-            metrical_numbers = globals.MALE_SOIL.metre_per_vox_per_bar[
-                self.__bar_number
-            ]
-        self.__metrical_numbers = metrical_numbers
-        self.__anticipation_time = anticipation_time
-        self.__overlaying_time = overlaying_time
-        self.__pteq_engine_per_voice = pteq_engine_per_voice
-        self.__diva_engine_per_voice = diva_engine_per_voice
+            metrical_numbers = globals.MALE_SOIL.metre_per_vox_per_bar[self._bar_number]
+        self._metrical_numbers = metrical_numbers
+        self._anticipation_time = anticipation_time
+        self._overlaying_time = overlaying_time
+        self._voices_overlaying_time = voices_overlaying_time
+        self._pteq_engine_per_voice = pteq_engine_per_voice
+        self._diva_engine_per_voice = diva_engine_per_voice
+        self._ambitus_maker = ambitus_maker
+        self._start_harmony = start_harmony
+        self._cp_add_dissonant_pitches_to_nth_voice = (
+            cp_add_dissonant_pitches_to_nth_voice
+        )
 
         if rhythm_maker is None:
 
             def rhythm_maker(self) -> tuple:
                 return tuple(
                     binr.Compound.from_euclid(
-                        metrical_prime * self.__n_bars, 7 * self.__n_bars
+                        metrical_prime * self._n_bars, metrical_prime * self._n_bars
                     )
-                    for metrical_prime in self.__metrical_numbers
+                    for metrical_prime in self._metrical_numbers
                 )
 
         rhythms = polyrhythms.Polyrhythm(*rhythm_maker(self)).transformed_rhythms
 
-        self.__bar_size = int(sum(rhythms[0])) // n_bars
-        self.__weight_per_beat_for_one_bar = self.make_weight_per_beat_for_one_bar(
-            self.__metrical_numbers, self.__bar_size
+        self._rhythms = rhythms
+        self._bar_size = int(sum(rhythms[0])) // n_bars
+        self._weight_per_beat_for_one_bar = self.make_weight_per_beat_for_one_bar(
+            self._metrical_numbers, self._bar_size
         )
-        self.__tempo_factor = self.convert_duration2factor(
-            duration_per_bar, self.__bar_size
-        )
-
-        self.__weight_per_beat = tuple(
-            self.__weight_per_beat_for_one_bar * self.__n_bars
+        self._tempo_factor = self.convert_duration2factor(
+            duration_per_bar, self._bar_size
         )
 
-        cp = self.counterpoint_class(
-            rhythms,
-            gender=gender,
-            weight_per_beat=self.__weight_per_beat,
-            constraints_harmonic_resolution=cp_constraints_harmonic,
-            constraints_added_pitches=cp_constraints_interpolation,
-            ambitus_maker=ambitus_maker,
-            start_harmony=start_harmony,
-        )
-        self.__counterpoint_result = cp(
-            *globals.MALE_SOIL.harmonic_primes_per_bar[self.__bar_number]
-        )
+        self._weight_per_beat = tuple(self._weight_per_beat_for_one_bar * self._n_bars)
+
+        self._harmonic_primes = globals.MALE_SOIL.harmonic_primes_per_bar[
+            self._bar_number
+        ]
+        self._counterpoint_result = self.make_counterpoint_result()
 
         init_attributes = {}
 
-        self.__duration_per_voice = duration_per_bar * self.__n_bars
+        self._duration_per_voice = duration_per_bar * self._n_bars
 
-        self.__voices_inner = tuple(
+        self._voices_inner = tuple(
             old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
-            for vox in self.__counterpoint_result[0]
+            for vox in self._counterpoint_result[0]
         )
-        self.__attribute_maker_inner = pteqer.AttributeMaker(
-            self.__voices_inner,
-            metricity_per_beat=self.__weight_per_beat,
+        self._attribute_maker_inner = pteqer.AttributeMaker(
+            self._voices_inner,
+            metricity_per_beat=self._weight_per_beat,
             max_spectrum_profile_change=max_spectrum_profile_change,
             dynamic_range=dynamic_range_of_voices,
         )
 
-        self.__voices_outer = tuple(
+        self._voices_outer = tuple(
             old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
-            for vox in self.__counterpoint_result[1]
+            for vox in self._counterpoint_result[1]
         )
-        self.__attribute_maker_outer = pteqer.AttributeMaker(
-            self.__voices_outer,
-            metricity_per_beat=self.__weight_per_beat,
+        self._attribute_maker_outer = pteqer.AttributeMaker(
+            self._voices_outer,
+            metricity_per_beat=self._weight_per_beat,
             max_spectrum_profile_change=max_spectrum_profile_change,
             dynamic_range=dynamic_range_of_voices,
         )
@@ -221,12 +206,12 @@ class ThreeVoiceCP(PBIII_Segment):
             voices_inner_and_outer = []
             for voices, volume_per_voice in (
                 (
-                    self.__voices_inner,
-                    self.__attribute_maker_inner.volume_per_tone_per_voice,
+                    self._voices_inner,
+                    self._attribute_maker_inner.volume_per_tone_per_voice,
                 ),
                 (
-                    self.__voices_outer,
-                    self.__attribute_maker_outer.volume_per_tone_per_voice,
+                    self._voices_outer,
+                    self._attribute_maker_outer.volume_per_tone_per_voice,
                 ),
             ):
                 voices = tuple(
@@ -242,14 +227,14 @@ class ThreeVoiceCP(PBIII_Segment):
                 self.make_natural_radio(
                     voices_inner_and_outer[0],
                     voices_inner_and_outer[1],
-                    self.__tempo_factor,
+                    self._tempo_factor,
                     gender,
                     make_envelope=radio_make_envelope,
                     samples=radio_samples,
                     n_changes=radio_n_changes,
                     crossfade_duration=radio_crossfade_duration,
-                    anticipation_time=self.__anticipation_time,
-                    overlaying_time=self.__overlaying_time,
+                    anticipation_time=self._anticipation_time,
+                    overlaying_time=self._overlaying_time,
                     average_volume=radio_average_volume,
                     min_volume=radio_min_volume,
                     max_volume=radio_max_volume,
@@ -265,9 +250,48 @@ class ThreeVoiceCP(PBIII_Segment):
             name=name, start=start, tracks2ignore=tracks2ignore, **init_attributes
         )
 
+    @staticmethod
+    def mk_harmonies(gender: tuple) -> tuple:
+        empty_tuple = tuple([])
+
+        harmonies = []
+        for har in globals.BLUEPRINT_HARMONIES:
+            har = globals.BLUEPRINT_HARMONIES[har]
+            dissonant_pitches = har[1]
+            useable_harmonies = har[0][0] + har[0][1]
+            for inner_harmony_or_substitue in useable_harmonies:
+                harmonies.append(
+                    (inner_harmony_or_substitue, empty_tuple, dissonant_pitches)
+                )
+                for n_empty_pitches in range(1, 3):
+                    for empty_pitches in itertools.combinations(
+                        tuple(range(3)), n_empty_pitches
+                    ):
+                        new_blueprint_harmony = ji.BlueprintHarmony(
+                            *tuple(
+                                p
+                                for p_idx, p in enumerate(
+                                    inner_harmony_or_substitue.blueprint
+                                )
+                                if p_idx not in empty_pitches
+                            )
+                        )
+                        harmonies.append(
+                            (new_blueprint_harmony, empty_pitches, dissonant_pitches)
+                        )
+
+        if not gender:
+            harmonies = tuple((h[0].inverse(), h[1], h[2].inverse()) for h in harmonies)
+
+        return tuple(harmonies)
+
+    @abc.abstractmethod
+    def make_counterpoint_result(self) -> tuple:
+        raise NotImplementedError
+
     @property
     def duration(self) -> float:
-        return super().duration - self.__overlaying_time
+        return super().duration - self._overlaying_time
 
     def make_voices(self) -> dict:
         init_attributes = {}
@@ -279,28 +303,29 @@ class ThreeVoiceCP(PBIII_Segment):
             volume_per_tone,
             pteq_engine,
         ) in zip(
-            range(len(self.__counterpoint_result[0])),
-            self.__counterpoint_result[0],
-            self.__attribute_maker_inner.spectrum_profile_per_tone,
-            self.__attribute_maker_inner.volume_per_tone_per_voice,
-            self.__pteq_engine_per_voice,
+            range(len(self._counterpoint_result[0])),
+            self._counterpoint_result[0],
+            self._attribute_maker_inner.spectrum_profile_per_tone,
+            self._attribute_maker_inner.volume_per_tone_per_voice,
+            self._pteq_engine_per_voice,
         ):
             sound_engine = pteq_engine(
-                self.__tempo_factor,
+                self._tempo_factor,
                 voice[0],
                 voice[1],
                 voice[2],
                 volume_per_tone,
                 spectrum_profile_per_tone,
+                self._voices_overlaying_time,
             )
 
-            voice_name = "voice{}{}".format(self.__gender_code, v_idx)
+            voice_name = "voice{}{}".format(self._gender_code, v_idx)
 
             init_attributes.update(
                 {
                     voice_name: {
                         "start": 0,
-                        "duration": self.__duration_per_voice,
+                        "duration": self._duration_per_voice,
                         "sound_engine": sound_engine,
                     }
                 }
@@ -310,14 +335,14 @@ class ThreeVoiceCP(PBIII_Segment):
 
     def make_diva_voices(self) -> dict:
         init_attributes = {}
-        for v_idx, voice in enumerate(self.__counterpoint_result[1]):
-            voice_name = "diva{}{}".format(self.__gender_code, v_idx)
-            sound_engine = diva.DivaSimulation(self.__tempo_factor, voice[0], voice[1])
+        for v_idx, voice in enumerate(self._counterpoint_result[1]):
+            voice_name = "diva{}{}".format(self._gender_code, v_idx)
+            sound_engine = diva.DivaSimulation(self._tempo_factor, voice[0], voice[1])
             init_attributes.update(
                 {
                     voice_name: {
                         "start": 0,
-                        "duration": self.__duration_per_voice,
+                        "duration": self._duration_per_voice,
                         "sound_engine": sound_engine,
                     }
                 }
@@ -330,16 +355,16 @@ class ThreeVoiceCP(PBIII_Segment):
     ) -> dict:
         init_attributes = {}
         if include_dissonant_pitches:
-            voice_base = self.__counterpoint_result[0]
+            voice_base = self._counterpoint_result[0]
         else:
-            voice_base = self.__counterpoint_result[1]
+            voice_base = self._counterpoint_result[1]
 
         voices = tuple(
             old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
             for vox in voice_base
         )
-        glitter_duration = self.__duration_per_voice + self.__anticipation_time
-        glitter_duration += self.__overlaying_time
+        glitter_duration = self._duration_per_voice + self._anticipation_time
+        glitter_duration += self._overlaying_time
 
         for combination, modulator in zip(
             tuple(itertools.combinations(tuple(range(3)), 2)),
@@ -348,20 +373,18 @@ class ThreeVoiceCP(PBIII_Segment):
             sound_engine = glitter.GlitterEngine(
                 voices[combination[0]],
                 voices[combination[1]],
-                self.__tempo_factor,
-                anticipation_time=self.__anticipation_time,
-                overlaying_time=self.__overlaying_time,
+                self._tempo_factor,
+                anticipation_time=self._anticipation_time,
+                overlaying_time=self._overlaying_time,
                 modulator=modulator,
             )
 
-            voice_name = "glitter{}{}{}".format(
-                self.__gender_code, *sorted(combination)
-            )
+            voice_name = "glitter{}{}{}".format(self._gender_code, *sorted(combination))
 
             init_attributes.update(
                 {
                     voice_name: {
-                        "start": -self.__anticipation_time,
+                        "start": -self._anticipation_time,
                         "duration": glitter_duration,
                         "sound_engine": sound_engine,
                     }
@@ -522,16 +545,16 @@ class ThreeVoiceCP(PBIII_Segment):
     def _render_midi_diva(self, path: str) -> None:
         for v_idx, voice, volume_per_tone, diva_engine in zip(
             range(3),
-            self.__counterpoint_result[1],
-            self.__attribute_maker_outer.volume_per_tone_per_voice,
-            self.__diva_engine_per_voice,
+            self._counterpoint_result[1],
+            self._attribute_maker_outer.volume_per_tone_per_voice,
+            self._diva_engine_per_voice,
         ):
             voice = tuple(
                 old.Tone(p, r, volume=v)
                 for p, r, v in zip(*(tuple(voice) + (volume_per_tone,)))
             )
-            diva_path = "{}/diva{}{}.mid".format(path, self.__gender_code, v_idx)
-            diva_engine(voice, self.__tempo_factor).render(diva_path)
+            diva_path = "{}/diva{}{}.mid".format(path, self._gender_code, v_idx)
+            diva_engine(voice, self._tempo_factor).render(diva_path)
 
     def render(self, path: str) -> None:
         # make midi file render for DIVA
@@ -541,14 +564,77 @@ class ThreeVoiceCP(PBIII_Segment):
         super().render(path)
 
 
+class FreeStyleCP(PBIII_Segment):
+    counterpoint_class = counterpoint.FreeStyleCP
+
+    def __init__(
+        self,
+        name: str,
+        energy_per_voice: tuple = None,
+        silence_decider_per_voice: tuple = None,
+        weight_range: tuple = (2, 10),
+        decision_type: str = "activity",
+        random_seed: int = 100,
+        *args,
+        **kwargs,
+    ) -> None:
+        self._random_seed = random_seed
+        self._energy_per_voice = energy_per_voice
+        self._silence_decider_per_voice = silence_decider_per_voice
+        self._weight_range = weight_range
+        self._decision_type = decision_type
+        super().__init__(name, *args, **kwargs)
+
+    def make_counterpoint_result(self) -> tuple:
+        add_dissonant_pitches_to_nth_voice = self._cp_add_dissonant_pitches_to_nth_voice
+        self._cp = self.counterpoint_class(
+            self.mk_harmonies(self._gender),
+            self._rhythms,
+            weights_per_beat=self._weight_per_beat,
+            constraints_added_pitches=self._cp_constraints_interpolation,
+            add_dissonant_pitches_to_nth_voice=add_dissonant_pitches_to_nth_voice,
+            ambitus_maker=self._ambitus_maker,
+            start_harmony=self._start_harmony,
+            energy_per_voice=self._energy_per_voice,
+            silence_decider_per_voice=self._silence_decider_per_voice,
+            weight_range=self._weight_range,
+            decision_type=self._decision_type,
+            random_seed=self._random_seed,
+        )
+        return self._cp(*globals.MALE_SOIL.harmonic_primes_per_bar[self._bar_number])
+
+
+class ThreeVoiceCP(PBIII_Segment):
+    counterpoint_class = counterpoint.RhythmicCP
+
+    def __init__(
+        self, name: str, cp_constraints_harmonic: tuple = tuple([]), *args, **kwargs
+    ) -> None:
+        self._cp_constraints_harmonic = cp_constraints_harmonic
+
+        super().__init__(name, *args, **kwargs)
+
+    def make_counterpoint_result(self) -> tuple:
+        add_dissonant_pitches_to_nth_voice = self._cp_add_dissonant_pitches_to_nth_voice
+        cp = self.counterpoint_class(
+            self.mk_harmonies(self._gender),
+            self._rhythms,
+            weights_per_beat=self._weight_per_beat,
+            constraints_harmonic_resolution=self._cp_constraints_harmonic,
+            constraints_added_pitches=self._cp_constraints_interpolation,
+            add_dissonant_pitches_to_nth_voice=add_dissonant_pitches_to_nth_voice,
+            ambitus_maker=self._ambitus_maker,
+            start_harmony=self._start_harmony,
+        )
+        return cp(*globals.MALE_SOIL.harmonic_primes_per_bar[self._bar_number])
+
+
 class Chord(ThreeVoiceCP):
     def __init__(self, name: str, chord: harmony.find_harmony(), **kwargs):
         def rhythm_maker(self) -> tuple:
             return tuple(
-                binr.Compound.from_euclid(
-                    metrical_prime * self._ThreeVoiceCP__n_bars, 1
-                )
-                for metrical_prime in self._ThreeVoiceCP__metrical_numbers
+                binr.Compound.from_euclid(metrical_prime * self._n_bars, 1)
+                for metrical_prime in self._metrical_numbers
             )
 
         if "rhythm_maker" not in kwargs:
@@ -568,10 +654,10 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
             ((0, 1), (0, 2), (1, 2))
         ),
         *args,
-        **kwargs
+        **kwargs,
     ):
         def rhythm_maker(self) -> tuple:
-            n_bars = self._ThreeVoiceCP__n_bars
+            n_bars = self._n_bars
             # for first attack every voice should have a theoretical attack
             # (rests are explicitly controlled through the start_harmony argument)
             distribution_for_first_attack_per_bar = ((0, 1, 2),)
@@ -580,12 +666,9 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
                 for i in range(n_bars - 1)
             )
             rhythm_per_voice = []
-            max_attacks_per_bar = min(self._ThreeVoiceCP__metrical_numbers)
+            max_attacks_per_bar = min(self._metrical_numbers)
             for voice_idx, metrical_prime, density, curve in zip(
-                range(3),
-                self._ThreeVoiceCP__metrical_numbers,
-                density_per_voice,
-                curve_per_voice,
+                range(3), self._metrical_numbers, density_per_voice, curve_per_voice
             ):
 
                 rhythm = []
@@ -609,10 +692,10 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
                     has_first_attack = voice_idx in distribution_for_first_attack
                     n_attacks = n_attacks_per_bar + has_first_attack
 
-                    if rhythmic_function is "euclid":
+                    if rhythmic_function == "euclid":
                         current_rhythm = tools.euclid(metrical_prime, n_attacks)
 
-                    elif rhythmic_function is "barlow":
+                    elif rhythmic_function == "barlow":
                         if metrical_prime == 10:
                             divided = (2, 5)
                         else:
