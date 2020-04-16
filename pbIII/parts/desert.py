@@ -18,7 +18,6 @@ GROUP = 2
 # GROUP = 3
 SUB_GROUP0 = 0
 
-"""
 # high glitter
 GENDER = False
 GROUP = 3
@@ -190,7 +189,7 @@ PART = (
         radio_min_volume=0.7,
     ),
 )
-"""
+
 
 """
 # chords
@@ -264,7 +263,6 @@ PART = (
     ),
 )
 """
-
 
 """
 # floating counterpoint

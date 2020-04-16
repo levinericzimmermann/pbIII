@@ -7,6 +7,7 @@ from mu.mel import ji
 from mu.mel import mel
 from mu.rhy import binr
 from mu.rhy import indispensability
+from mu.rhy import rhy
 from mu.sco import old
 from mu.utils import infit
 from mu.utils import prime_factors
@@ -151,6 +152,7 @@ class PBIII_Segment(MU.Segment):
         self._tempo_factor = self.convert_duration2factor(
             duration_per_bar, self._bar_size
         )
+        self._include_diva = include_diva
 
         self._weight_per_beat = tuple(self._weight_per_beat_for_one_bar * self._n_bars)
 
@@ -433,7 +435,10 @@ class PBIII_Segment(MU.Segment):
             tuple(
                 (delay, tone.volume)
                 for delay, tone in zip(
-                    melody.delay.stretch(tempo_factor).convert2absolute(), melody
+                    rhy.Compound(melody.delay)
+                    .stretch(tempo_factor)
+                    .convert2absolute(),
+                    melody,
                 )
             )
             for melody in voices_main
@@ -557,11 +562,12 @@ class PBIII_Segment(MU.Segment):
             diva_engine(voice, self._tempo_factor).render(diva_path)
 
     def render(self, path: str) -> None:
-        # make midi file render for DIVA
-        self._render_midi_diva(path)
+        if self._include_diva:
+            # make midi file render for DIVA
+            self._render_midi_diva(path)
 
         # make usual sound file render
-        super().render(path)
+        return super().render(path)
 
 
 class FreeStyleCP(PBIII_Segment):

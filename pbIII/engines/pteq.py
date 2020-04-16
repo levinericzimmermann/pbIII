@@ -1,3 +1,5 @@
+import subprocess
+
 from mutools import pteqer
 from mutools import synthesis
 
@@ -54,7 +56,7 @@ class __PianoteqVoice(synthesis.SoundEngine):
     def make_ornamentation_vibrato(self) -> tuple:
         pass
 
-    def render(self, path: str) -> None:
+    def render(self, path: str) -> subprocess.Popen:
         adapted_rhythms = [rhythm * self.__tempo_factor for rhythm in self.__rhythm]
         adapted_rhythms[-1] += self.__overlaying_time
 
@@ -108,7 +110,7 @@ class __PianoteqVoice(synthesis.SoundEngine):
             sequence.append(tone)
 
         pteq = midiplug.Pianoteq(tuple(sequence))
-        pteq.export2wav(path, preset=self.preset, fxp=self.fxp)
+        return pteq.export2wav(path, preset=self.preset, fxp=self.fxp)
 
 
 __USED_PIANOTEQ_PARAMETER = {

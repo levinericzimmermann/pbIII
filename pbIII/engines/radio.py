@@ -5,6 +5,8 @@ from mutools import synthesis
 from mu.sco import old
 from mu.utils import interpolations
 
+from mu.rhy import rhy
+
 
 class RadioEngine(synthesis.BasedCsoundEngine):
     def __init__(
@@ -36,8 +38,8 @@ class RadioEngine(synthesis.BasedCsoundEngine):
 
         self.__random_module = random_module
 
-        voice.delay = voice.delay.stretch(tempo_factor)
-        voice.dur = voice.dur.stretch(tempo_factor)
+        voice.delay = rhy.Compound(voice.delay).stretch(tempo_factor)
+        voice.dur = rhy.Compound(voice.dur).stretch(tempo_factor)
 
         self.__duration_per_sample = {
             sample: pyo.sndinfo(sample)[1] for sample in set(sample_per_change)
