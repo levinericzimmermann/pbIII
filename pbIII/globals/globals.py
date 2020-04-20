@@ -1,3 +1,9 @@
+import natsort
+import os
+import re
+
+import abjad
+
 from mu.mel import ji
 from mu.mel import shortwriting as sw
 
@@ -242,14 +248,17 @@ VOICE_VOLUME = 1.6
 DIVA_VOLUME = 0.22
 NATURAL_RADIO_VOLUME = 0.085
 SPEECH_VOLUME = 0.15
+PERCUSSION_VOLUME = 0.68
 
-GENERAL_FACTOR = 0.95
+GENERAL_FACTOR = 0.775
 
 GLITTER_VOLUME *= GENERAL_FACTOR
 VOICE_VOLUME *= GENERAL_FACTOR
 DIVA_VOLUME *= GENERAL_FACTOR
 NATURAL_RADIO_VOLUME *= GENERAL_FACTOR
 SPEECH_VOLUME *= GENERAL_FACTOR
+PERCUSSION_VOLUME *= GENERAL_FACTOR
+
 
 PBIII_ORCHESTRATION = MU.Orchestration(
     # pianoteq voices
@@ -281,9 +290,16 @@ PBIII_ORCHESTRATION = MU.Orchestration(
     MU.Track("natural_radio_4", NATURAL_RADIO_VOLUME, 0.8),
     MU.Track("natural_radio_5", NATURAL_RADIO_VOLUME, 1),
     # voice samples
-    MU.Track("voice0", SPEECH_VOLUME, 0),
-    MU.Track("voice1", SPEECH_VOLUME, 0.5),
-    MU.Track("voice2", SPEECH_VOLUME, 1),
+    MU.Track("speech0", SPEECH_VOLUME, 0),
+    MU.Track("speech1", SPEECH_VOLUME, 0.5),
+    MU.Track("speech2", SPEECH_VOLUME, 1),
+    # percussion samples
+    MU.Track("percussion_P0", PERCUSSION_VOLUME, 0.4),
+    MU.Track("percussion_P1", PERCUSSION_VOLUME, 0.8),
+    MU.Track("percussion_P2", PERCUSSION_VOLUME, 0),
+    MU.Track("percussion_N0", PERCUSSION_VOLUME, 1),
+    MU.Track("percussion_N1", PERCUSSION_VOLUME, 0.2),
+    MU.Track("percussion_N2", PERCUSSION_VOLUME, 0.6),
 )
 
 MU_NAME = "pbIII/build"
@@ -297,3 +313,76 @@ FEMALE_SOIL = soil.JICounterpoint(harmonic_gender=False)
 # VOICE IN THE RESPECTIVE GENDER
 POSITIVE_VOICES_POSITION = (0, 2, 4)
 NEGATIVE_VOICES_POSITIONS = (3, 5, 1)
+
+
+###########################################################################
+#   generate globals variables for the different available samples        #
+###########################################################################
+
+
+class _Samples(object):
+    def __init__(self, dictionary_path: str, information: dict = {}) -> None:
+        samples = tuple(
+            natsort.natsorted(
+                tuple(
+                    "{}{}".format(dictionary_path, f)
+                    for f in os.listdir(dictionary_path)
+                    if f[-3:] == "wav"
+                )
+            )
+        )
+        self.__samples = samples
+        self.__path = dictionary_path
+        self.__information = information
+
+    @property
+    def information(self) -> dict:
+        return self.__information
+
+    def __repr__(self) -> str:
+        return repr(self.__samples)
+
+    def __iter__(self):
+        return iter(self.__samples)
+
+    def __getitem__(self, idx):
+        return self.__samples[idx]
+
+
+def _find_files(
+    path: str, redundant: str = "pbIII/samples/", info_file_name: str = "info.txt"
+):
+    contain_files = False
+    files = os.listdir(path)
+    for f in files:
+        complete_path = "{}{}".format(path, f)
+        if os.path.isdir(complete_path):
+            _find_files("{}/".format(complete_path), redundant)
+        else:
+            contain_files = True
+
+    if contain_files:
+        variable_name = "SAM_{}".format(
+            re.sub("/", "_", path).upper()[len(redundant) : -1]
+        )
+
+        if info_file_name in files:
+            with open("{}{}".format(path, info_file_name), "r") as f:
+                pitch_name = f.readline()[:-1]
+                frequency = abjad.NamedPitch(pitch_name).hertz
+        else:
+            frequency = None
+
+        globals().update({variable_name: _Samples(path, {"frequency": frequency})})
+
+
+_find_files("pbIII/samples/cymbals/")
+_find_files("pbIII/samples/kendang/")
+_find_files("pbIII/samples/speech/derrida/")
+_find_files("pbIII/samples/speech/fisher/")
+_find_files("pbIII/samples/speech/ghost_dance/")
+_find_files("pbIII/samples/speech/ian_curtis/")
+_find_files("pbIII/samples/speech/space/")
+_find_files("pbIII/samples/speech/time/")
+_find_files("pbIII/samples/speech/weather_forecast/")
+_find_files("pbIII/samples/speech/sliced/")

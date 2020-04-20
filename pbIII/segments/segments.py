@@ -27,6 +27,7 @@ from pbIII.globals import globals
 
 from pbIII.engines import diva
 from pbIII.engines import glitter
+from pbIII.engines import percussion
 from pbIII.engines import pteq
 from pbIII.engines import radio
 
@@ -73,6 +74,7 @@ class PBIII_Segment(MU.Segment):
         include_diva: bool = True,
         include_glitter: bool = True,
         include_natural_radio: bool = True,
+        include_percussion: bool = True,
         dynamic_range_of_voices: tuple = (0.2, 0.95),
         max_spectrum_profile_change: int = 10,
         voices_overlaying_time: float = 1,
@@ -109,6 +111,11 @@ class PBIII_Segment(MU.Segment):
             diva.FloatingDivaMidiEngine,
             diva.FloatingDivaMidiEngine,
         ),
+        percussion_engine_per_voice: tuple = (
+            percussion.Rhythmizer(),
+            percussion.Rhythmizer(),
+            percussion.Rhythmizer(),
+        ),
         # in case the user want to use her or his own metrical numbers
         metrical_numbers: tuple = None,
     ) -> None:
@@ -144,6 +151,7 @@ class PBIII_Segment(MU.Segment):
 
         rhythms = polyrhythms.Polyrhythm(*rhythm_maker(self)).transformed_rhythms
 
+        self._percussion_engine_per_voice = percussion_engine_per_voice
         self._rhythms = rhythms
         self._bar_size = int(sum(rhythms[0])) // n_bars
         self._weight_per_beat_for_one_bar = self.make_weight_per_beat_for_one_bar(
@@ -244,6 +252,10 @@ class PBIII_Segment(MU.Segment):
                     silent_channels=radio_silent_channels,
                 )
             )
+
+        # make percussion voices
+        if include_percussion:
+            init_attributes.update(self.make_percussion_voices())
 
         # make speech voices
         init_attributes.update(speech_init_attributes)
@@ -435,9 +447,7 @@ class PBIII_Segment(MU.Segment):
             tuple(
                 (delay, tone.volume)
                 for delay, tone in zip(
-                    rhy.Compound(melody.delay)
-                    .stretch(tempo_factor)
-                    .convert2absolute(),
+                    rhy.Compound(melody.delay).stretch(tempo_factor).convert2absolute(),
                     melody,
                 )
             )
@@ -521,6 +531,39 @@ class PBIII_Segment(MU.Segment):
                             }
                         }
                     )
+
+        return init_attributes
+
+    def make_percussion_voices(self) -> dict:
+        init_attributes = {}
+
+        for v_idx, percussion_engine in enumerate(self._percussion_engine_per_voice):
+            if type(percussion_engine) == percussion.Rhythmizer:
+                percussion_engine.weight_per_beat = self._weight_per_beat
+                percussion_engine.voice = self._voices_inner[v_idx]
+                percussion_engine.n_bars = self._n_bars
+                percussion_engine.tempo_factor = self._tempo_factor
+                percussion_engine.allowed_metrical_numbers = (
+                    self._metrical_numbers[v_idx],
+                )
+                percussion_engine.bar_number = self._bar_number
+
+            else:
+                msg = "Unknown engine for percussion: {}".format(
+                    type(percussion_engine)
+                )
+                raise TypeError(msg)
+
+            name = "percussion_{}{}".format(self._gender_code, v_idx)
+            init_attributes.update(
+                {
+                    name: {
+                        "start": 0,
+                        "duration": self._duration_per_voice,
+                        "sound_engine": percussion_engine,
+                    }
+                }
+            )
 
         return init_attributes
 
@@ -636,7 +679,7 @@ class ThreeVoiceCP(PBIII_Segment):
 
 
 class Chord(ThreeVoiceCP):
-    def __init__(self, name: str, chord: harmony.find_harmony(), **kwargs):
+    def __init__(self, name: str, chord: tuple = harmony.find_harmony(), **kwargs):
         def rhythm_maker(self) -> tuple:
             return tuple(
                 binr.Compound.from_euclid(metrical_prime * self._n_bars, 1)

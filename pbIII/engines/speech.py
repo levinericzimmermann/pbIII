@@ -419,7 +419,15 @@ class BrokenRadio(synthesis.PyoEngine):
 class Sampler(synthesis.PyoEngine):
     init_args = {"volume": 1, "skip_n_seconds": 0, "fadein": 0, "fadeout": 0}
 
-    def __init__(self, path: str, duration: float, **kwargs):
+    def __init__(
+        self, path: str, duration: float = None, loops: float = None, **kwargs
+    ):
+        if duration is None or loops is not None:
+            duration = synthesis.pyo.sndinfo(path)[1]
+
+        if loops is not None:
+            duration *= loops
+
         super().__init__()
         self.__path = path
         self.__duration = duration
@@ -448,7 +456,10 @@ class Sampler(synthesis.PyoEngine):
 
         soundfile = synthesis.pyo.SndTable(self.path)
         osc = synthesis.pyo.Osc(
-            soundfile, freq=soundfile.getRate(), interp=4, mul=self.__init_args["volume"]
+            soundfile,
+            freq=soundfile.getRate(),
+            interp=4,
+            mul=self.__init_args["volume"],
         )
         osc.out()
 
