@@ -99,7 +99,6 @@ class _AbstractInstrument(metaclass=_MetaSample):
         score_lines = self.make_score_lines(instrument_idx, start, duration, **kwargs)
         return instrument, score_lines
 
-
 class Sample(_AbstractInstrument):
     _basic_args = tuple([])
     _infit_args = {
@@ -114,6 +113,31 @@ class Sample(_AbstractInstrument):
         "channels": (tuple, type(None)),
         # float to skip n seconds of the sample or None for starting at the beginning
         "skip_time": (float, type(None)),
+        #############################################################################
+        ############## EFFECTS ######################################################
+        #############################################################################
+        # float for having a resonance filter at the particular frequency or None if no
+        # resonance filter shall be used
+        "resonance_filter_frequency": (float, type(None)),
+        # float for having a resonance filter with the particular bandwidth or None if no
+        # resonance filter shall be used
+        "resonance_filter_bandwidth": (float, type(None)),
+        # float for having a notch filter at the particular frequency or None if no
+        # resonance filter shall be used
+        "notch_filter_frequency": (float, type(None)),
+        # float for having a notch filter with the particular bandwidth or None if no
+        # resonance filter shall be used
+        "notch_filter_bandwidth": (float, type(None)),
+        "lowpass_filter_frequency": (float, type(None)),
+        "lowpass_filter_q": (float, type(None)),
+        "distortion": (float, type(None)),
+    }
+
+    _effects = {
+        "reson": ("resonance_filter_frequency", "resonance_filter_bandwidth", 1),
+        "areson": ("notch_filter_frequency", "notch_filter_bandwidth"),
+        "lowpass2": ("lowpass_filter_frequency", "lowpass_filter_q"),
+        "distort": ("distortion",),
     }
 
     # possible arguments send from outside the class.
@@ -145,11 +169,51 @@ class Sample(_AbstractInstrument):
             )
         )
         summarized = "aSummarized = ({}) / {}".format(summarized, len(channel2use))
-        out = "out aSummarized * p7"
+
+        last_signal = "aSummarized"
+        effect_lines = []
+        for effect in self._effects:
+            arguments = self._effects[effect]
+            argument_values = {
+                arg: kwargs[arg] for arg in arguments if type(arg) is str
+            }
+            if all(tuple(argument_values[arg] != None for arg in argument_values)):
+
+                if effect == "distort":
+                    dist_table_name = "iDistTable"
+                    dist_func_table = "{} ftgenonce 0,0, 257, 9, .5,1,270,1.5,.33,90,".format(
+                        dist_table_name
+                    )
+                    dist_func_table += "2.5,.2,270,3.5,.143,90,4.5,.111,270"
+                    effect_lines.append(dist_func_table)
+                    arguments += (dist_table_name,)
+
+                signal_name = "aEffect{}".format(len(effect_lines))
+                fx = "{} {} {}, ".format(signal_name, effect, last_signal)
+
+                fx_data = []
+                for val in arguments:
+                    try:
+                        fx_data.append(str(argument_values[val]))
+                    except KeyError:
+                        fx_data.append(str(val))
+
+                fx += ", ".join(fx_data)
+                effect_lines.append(fx)
+                last_signal = signal_name
+
+        if effect_lines:
+            balance = "{0} balance {0}, aSummarized".format(last_signal)
+        else:
+            balance = ""
+
+        out = "out {} * p7".format(last_signal)
 
         top_definition = super().instrument(instrument_idx)
 
-        lines = (top_definition[0], diskin2, summarized, out, top_definition[-1])
+        lines = (top_definition[0], diskin2, summarized)
+        lines += tuple(effect_lines)
+        lines += (balance, out, top_definition[-1])
         return lines
 
     def make_score_lines(
@@ -199,23 +263,15 @@ class Sample(_AbstractInstrument):
 
 
 class Rhythmizer(synthesis.BasedCsoundEngine):
+    print_output = False
+    remove_files = True
 
     #########################################################################
-    #       ATTRIBUTES THAT HAS TO GET INITALISED BY SEGMENT CLASS          #
+    #       ATTRIBUTES THAT HAVE TO GET INITALISED BY SEGMENT CLASS          #
     #########################################################################
 
-    # tuple
-    weight_per_beat = None
-    # old.Melody
-    voice = None
-    # int
-    n_bars = None
-    # tuple filled with integer
-    allowed_metrical_numbers = None
-    # float
-    tempo_factor = None
-    # int
-    bar_number = None
+    # segment class
+    segment = None
 
     #########################################################################
     # values that get set after manual initalization before rendering       #
@@ -226,6 +282,7 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
 
     def __init__(
         self,
+        voice_meters2occupy: tuple = (0,),
         sample_maker: infit.InfIt = infit.Cycle(
             (
                 Sample(
@@ -263,8 +320,14 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
         seed: int = 100,
         chord: tuple = harmony.find_harmony(),
         ignore_beats_occupied_by_voice: bool = True,
+        voices2ignore: tuple = None,
         octaves: tuple = tuple(range(-3, 4)),
     ):
+        if voices2ignore is None:
+            voices2ignore = voice_meters2occupy
+
+        self._voices2ignore = voices2ignore
+        self._voice_meters2occupy = voice_meters2occupy
         self._sample_maker = sample_maker
         self._likelihood_range = likelihood_range
         self._volume_range = volume_range
@@ -278,9 +341,15 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
 
         self._random_module = random
 
+    @property
+    def allowed_metrical_numbers(self) -> tuple:
+        return tuple(
+            self.segment._metrical_numbers[idx] for idx in self._voice_meters2occupy
+        )
+
     def find_possible_attack_indices(self) -> tuple:
-        duration = int(self.voice.duration)
-        bar_size = duration // self.n_bars
+        duration = int(self.segment._duration)
+        bar_size = duration // self.segment._n_bars
         generator_size_per_metrical_number = (
             bar_size // number for number in self.allowed_metrical_numbers
         )
@@ -296,9 +365,15 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
         )
 
         if self._ignore_beats_occupied_by_voice:
-            occupied_by_voice = tuple(
-                int(item) for item in self.voice.convert2absolute().delay
-            )
+            occupied_by_voice = []
+            for v_idx in self._voices2ignore:
+                occupied_by_voice += [
+                    int(item)
+                    for item in self.segment._voices_inner[v_idx]
+                    .convert2absolute()
+                    .delay
+                ]
+
             attack_indices = tuple(
                 idx for idx in attack_indices if idx not in occupied_by_voice
             )
@@ -307,14 +382,18 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
 
     def find_attack_indices(self) -> tuple:
         possible_attack_indices = self.find_possible_attack_indices()
-        scaled_weights = tools.scale(self.weight_per_beat, *self._likelihood_range)
+        scaled_weights = tools.scale(
+            self.segment._weight_per_beat, *self._likelihood_range
+        )
 
         attack_positions = []
         original_weight = []
         for possible_attack_position in possible_attack_indices:
             if self._random_module.random() < scaled_weights[possible_attack_position]:
                 attack_positions.append(possible_attack_position)
-                original_weight.append(self.weight_per_beat[possible_attack_position])
+                original_weight.append(
+                    self.segment._weight_per_beat[possible_attack_position]
+                )
 
         return tuple(attack_positions), tuple(original_weight)
 
@@ -329,9 +408,9 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
             has_first_attack = False
 
         duration_values = tuple(
-            (b - a) * self.tempo_factor
+            (b - a) * self.segment._tempo_factor
             for a, b in zip(
-                attack_indices, attack_indices[1:] + (int(self.voice.duration),)
+                attack_indices, attack_indices[1:] + (int(self.segment._duration),)
             )
         )
         start_values = tools.accumulate_from_zero(duration_values)
@@ -355,7 +434,7 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
                     for octave in self._octaves
                 )
                 for p in self._chord[0](
-                    *globals.MALE_SOIL.harmonic_primes_per_bar[self.bar_number]
+                    *globals.MALE_SOIL.harmonic_primes_per_bar[self.segment._bar_number]
                 )
             ),
         )

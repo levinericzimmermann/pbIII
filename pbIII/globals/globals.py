@@ -376,13 +376,4 @@ def _find_files(
         globals().update({variable_name: _Samples(path, {"frequency": frequency})})
 
 
-_find_files("pbIII/samples/cymbals/")
-_find_files("pbIII/samples/kendang/")
-_find_files("pbIII/samples/speech/derrida/")
-_find_files("pbIII/samples/speech/fisher/")
-_find_files("pbIII/samples/speech/ghost_dance/")
-_find_files("pbIII/samples/speech/ian_curtis/")
-_find_files("pbIII/samples/speech/space/")
-_find_files("pbIII/samples/speech/time/")
-_find_files("pbIII/samples/speech/weather_forecast/")
-_find_files("pbIII/samples/speech/sliced/")
+_find_files("pbIII/samples/")

@@ -112,9 +112,9 @@ class PBIII_Segment(MU.Segment):
             diva.FloatingDivaMidiEngine,
         ),
         percussion_engine_per_voice: tuple = (
-            percussion.Rhythmizer(),
-            percussion.Rhythmizer(),
-            percussion.Rhythmizer(),
+            percussion.Rhythmizer((0,)),
+            percussion.Rhythmizer((1,)),
+            percussion.Rhythmizer((2,)),
         ),
         # in case the user want to use her or his own metrical numbers
         metrical_numbers: tuple = None,
@@ -177,6 +177,7 @@ class PBIII_Segment(MU.Segment):
             old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
             for vox in self._counterpoint_result[0]
         )
+        self._duration = self._voices_inner[0].duration
         self._attribute_maker_inner = pteqer.AttributeMaker(
             self._voices_inner,
             metricity_per_beat=self._weight_per_beat,
@@ -539,14 +540,7 @@ class PBIII_Segment(MU.Segment):
 
         for v_idx, percussion_engine in enumerate(self._percussion_engine_per_voice):
             if type(percussion_engine) == percussion.Rhythmizer:
-                percussion_engine.weight_per_beat = self._weight_per_beat
-                percussion_engine.voice = self._voices_inner[v_idx]
-                percussion_engine.n_bars = self._n_bars
-                percussion_engine.tempo_factor = self._tempo_factor
-                percussion_engine.allowed_metrical_numbers = (
-                    self._metrical_numbers[v_idx],
-                )
-                percussion_engine.bar_number = self._bar_number
+                percussion_engine.segment = self
 
             else:
                 msg = "Unknown engine for percussion: {}".format(

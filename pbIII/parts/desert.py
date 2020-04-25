@@ -22,7 +22,6 @@ GROUP = 2
 # GROUP = 3
 SUB_GROUP0 = 0
 
-"""
 # high glitter
 GENDER = False
 GROUP = 3
@@ -186,11 +185,34 @@ PART = (
         include_percussion=True,
         percussion_engine_per_voice=(
             percussion.Rhythmizer(
+                voice_meters2occupy=(0, 1, 2),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_CYMBALS_BIG_CLOSE),
                             pitch_factor=infit.Uniform(0.5, 2),
+                            distortion=infit.Uniform(0.05, 0.3),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_CYMBALS_MIDDLE_CLOSE_LOUD),
+                            pitch_factor=infit.Uniform(0.5, 2),
+                            distortion=infit.Uniform(0.04, 0.5),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.1, 0.7),
+                volume_range=(0.1, 0.8),
+                ignore_beats_occupied_by_voice=False,
+            ),
+            percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_CYMBALS_BIG_CLOSE),
+                            pitch_factor=infit.Uniform(0.5, 2),
+                            resonance_filter_frequency=infit.Uniform(5000, 9000),
+                            resonance_filter_bandwidth=infit.Uniform(200, 700),
                         ),
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_CYMBALS_MIDDLE_CLOSE_LOUD),
@@ -203,32 +225,20 @@ PART = (
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_CYMBALS_BIG_CLOSE),
                             pitch_factor=infit.Uniform(0.5, 2),
+                            resonance_filter_frequency=infit.Uniform(1000, 3000),
+                            resonance_filter_bandwidth=infit.Uniform(90, 200),
                         ),
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_CYMBALS_MIDDLE_CLOSE_LOUD),
                             pitch_factor=infit.Uniform(0.5, 2),
-                        ),
-                    )
-                ),
-                likelihood_range=(0.1, 0.7),
-                volume_range=(0.1, 0.8),
-                ignore_beats_occupied_by_voice=False,
-            ),
-            percussion.Rhythmizer(
-                sample_maker=infit.Cycle(
-                    (
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_CYMBALS_BIG_CLOSE),
-                            pitch_factor=infit.Uniform(0.5, 2),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_CYMBALS_MIDDLE_CLOSE_LOUD),
-                            pitch_factor=infit.Uniform(0.5, 2),
+                            resonance_filter_frequency=infit.Uniform(1000, 3000),
+                            resonance_filter_bandwidth=infit.Uniform(90, 200),
                         ),
                     )
                 ),
@@ -292,7 +302,6 @@ PART = (
         radio_min_volume=0.7,
     ),
 )
-"""
 
 
 """
@@ -334,18 +343,21 @@ PART = (
         ),
         percussion_engine_per_voice=(
             percussion.Rhythmizer(
+                voice_meters2occupy=(0,),
                 likelihood_range=(0.1, 0.6),
                 volume_range=(0.1, 0.8),
                 ignore_beats_occupied_by_voice=True,
                 seed=100,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
                 likelihood_range=(0.1, 0.8),
                 volume_range=(0.1, 1),
                 ignore_beats_occupied_by_voice=True,
                 seed=1000,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -446,6 +458,7 @@ PART = (
         ),
         percussion_engine_per_voice=(
             percussion.Rhythmizer(
+                voice_meters2occupy=(0,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -476,6 +489,7 @@ PART = (
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -506,6 +520,7 @@ PART = (
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -586,6 +601,7 @@ PART = (
         ),
         percussion_engine_per_voice=(
             percussion.Rhythmizer(
+                voice_meters2occupy=(0,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -609,6 +625,7 @@ PART = (
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
@@ -632,6 +649,7 @@ PART = (
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
                 sample_maker=infit.Cycle(
                     (
                         percussion.Sample(
