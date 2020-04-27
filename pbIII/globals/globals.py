@@ -195,6 +195,7 @@ BLUEPRINT_HARMONIES = {
 
 
 GREGORIAN_CHANT_SCALE = sw.translate2line("1 11+5- 5+ 11+ 3+ 13+ 7+")[0]
+
 # pitch that doesn't belong to usual harmonic / prime scale
 GREGORIAN_CHANT_SCALE_ADDITIONAL_PITCH = GREGORIAN_CHANT_SCALE[1]
 

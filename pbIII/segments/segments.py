@@ -1,6 +1,7 @@
 import abc
 import functools
 import itertools
+import math
 import operator
 
 from mu.mel import ji
@@ -16,12 +17,11 @@ from mu.utils import tools
 from mutools import ambitus
 from mutools import counterpoint
 from mutools import MU
+from mutools import organisms
 from mutools import polyrhythms
 from mutools import pteqer
 from mutools import schillinger
 
-
-# from pbIII.fragments import counterpoint
 from pbIII.fragments import harmony
 from pbIII.globals import globals
 
@@ -93,7 +93,6 @@ class PBIII_Segment(MU.Segment):
         radio_crossfade_duration: float = 0.5,
         radio_shadow_time: float = 0.175,
         radio_silent_channels: tuple = tuple([]),
-        cp_constraints_harmonic: tuple = tuple([]),
         cp_constraints_interpolation: tuple = tuple([]),
         cp_add_dissonant_pitches_to_nth_voice: tuple = (True, True, True),
         speech_init_attributes: dict = {},
@@ -647,7 +646,7 @@ class FreeStyleCP(PBIII_Segment):
         return self._cp(*globals.MALE_SOIL.harmonic_primes_per_bar[self._bar_number])
 
 
-class ThreeVoiceCP(PBIII_Segment):
+class RhythmicCP(PBIII_Segment):
     counterpoint_class = counterpoint.RhythmicCP
 
     def __init__(
@@ -672,7 +671,7 @@ class ThreeVoiceCP(PBIII_Segment):
         return cp(*globals.MALE_SOIL.harmonic_primes_per_bar[self._bar_number])
 
 
-class Chord(ThreeVoiceCP):
+class Chord(RhythmicCP):
     def __init__(self, name: str, chord: tuple = harmony.find_harmony(), **kwargs):
         def rhythm_maker(self) -> tuple:
             return tuple(
@@ -686,7 +685,7 @@ class Chord(ThreeVoiceCP):
         super().__init__(name=name, start_harmony=chord, **kwargs)
 
 
-class DensityBasedThreeVoiceCP(ThreeVoiceCP):
+class DensityBasedRhythmicCP(RhythmicCP):
     def __init__(
         self,
         name: str,
@@ -814,3 +813,172 @@ class DensityBasedThreeVoiceCP(ThreeVoiceCP):
             kwargs.update({kwarg_name: (constraint_AP_remove_non_relevant_pitches,)})
 
         super().__init__(name=name, *args, **kwargs)
+
+
+class Superorganism(PBIII_Segment):
+    def __init__(
+        self,
+        name: str,
+        action_per_voice: tuple = (0.8, 0.8, 0.8),
+        sound_per_voice: tuple = (0.8, 0.8, 0.8),
+        allow_unisono: bool = True,
+        allow_melodic_octaves: bool = False,
+        harmonic_weight: float = 2,
+        melodic_weight: float = 2,
+        random_seed: int = 100,
+        weight_range: tuple = (0, 1),
+        harmonicity_range: tuple = (0, 1),
+        *args,
+        **kwargs,
+    ):
+        self._action_per_voice = action_per_voice
+        self._sound_per_voice = sound_per_voice
+        self._allow_unisono = allow_unisono
+        self._allow_melodic_octaves = allow_melodic_octaves
+        self._harmonic_weight = harmonic_weight
+        self._melodic_weight = melodic_weight
+        self._random_seed = random_seed
+        self._weight_range = weight_range
+        self._predefined_voices = tuple([])
+
+        super().__init__(name, *args, **kwargs)
+
+    def find_allowed_pitches_per_voice(self) -> tuple:
+        pitches_per_voice = (globals.FEMALE_SOIL, globals.MALE_SOIL)[
+            self._gender
+        ].pitches_per_vox_per_bar[self._bar_number]
+        ambitus_per_voice = self._ambitus_maker(3)
+
+        allowed_pitches_per_voice = []
+        for amb, pitches in zip(ambitus_per_voice, pitches_per_voice):
+            allowed_pitches_per_voice.append(
+                functools.reduce(
+                    operator.add,
+                    tuple(amb.find_all_pitch_variants(pitch) for pitch in pitches),
+                )
+            )
+
+        return tuple(allowed_pitches_per_voice)
+
+    def make_counterpoint_result(self) -> tuple:
+        allowed_pitches_per_voice = self.find_allowed_pitches_per_voice()
+        self._organism = organisms.Organism(
+            self._action_per_voice,
+            self._sound_per_voice,
+            allowed_pitches_per_voice,
+            self._rhythms,
+            tools.scale(self._weight_per_beat, *self._weight_range),
+            predefined_voices=self._predefined_voices,
+            allow_unisono=self._allow_unisono,
+            allow_melodic_octaves=self._allow_melodic_octaves,
+            random_seed=self._random_seed,
+            harmonic_weight=self._harmonic_weight,
+            melodic_weight=self._melodic_weight,
+        )
+        converted_voices0 = []
+        converted_voices1 = []
+        for vox in tuple(self._organism):
+            converted = (tuple(vox.pitch), binr.Compound(vox.delay))
+            converted_voices0.append(converted + (tuple(True for i in vox.delay),))
+            converted_voices1.append(converted)
+
+        return tuple(converted_voices0), tuple(converted_voices1)
+
+
+class MelodicCP(Superorganism):
+    def __init__(
+        self,
+        name: str,
+        phrases: tuple = (0,),
+        melody_register: int = -1,
+        action_per_voice: tuple = (0.8, 0.8),
+        sound_per_voice: tuple = (0.8, 0.8),
+        **kwargs,
+    ):
+
+        self._melody_register = melody_register
+
+        phrases_range = tuple(range(len(globals.CHANT_ANCTUS_SANCTUS_PHRASES)))
+        for phrase_idx in phrases:
+            assert phrase_idx in phrases_range
+
+        used_phrases = tuple(
+            globals.CHANT_ANCTUS_SANCTUS_PHRASES[phrase_idx] for phrase_idx in phrases
+        )
+        self._melody_pitches, self._melody_beats = tuple(
+            functools.reduce(operator.add, map(ig, used_phrases))
+            for ig in map(operator.itemgetter, (0, 1))
+        )
+
+        if "metrical_numbers" in kwargs:
+            metrical_prime = kwargs["metrical_numbers"][0]
+
+        else:
+            try:
+                group = kwargs["group"]
+            except KeyError:
+                group = (0, 0, 0)
+            bar_number = globals.MALE_SOIL.detect_group_index(group)
+            metrical_numbers = globals.MALE_SOIL.metre_per_vox_per_bar[bar_number]
+            metrical_prime = metrical_numbers[0]
+
+        kwargs["n_bars"] = math.ceil(sum(self._melody_beats) / metrical_prime)
+
+        super().__init__(
+            name,
+            sound_per_voice=sound_per_voice,
+            action_per_voice=action_per_voice,
+            **kwargs,
+        )
+
+    def find_allowed_pitches_per_voice(self) -> tuple:
+        return super().find_allowed_pitches_per_voice()[1:]
+
+    def make_melody(self) -> old.Melody:
+        if self._gender:
+            self._melody_register = -self._melody_register
+
+        melody_pitches = tuple(
+            p if p.is_empty else p.register(p.octave + self._melody_register)
+            for p in self._melody_pitches
+        )
+
+        transposition_pitch = (
+            (globals.FEMALE_SOIL, globals.MALE_SOIL)[self._gender]
+            .pitches_per_vox_per_bar[self._bar_number][0][0]
+            .normalize()
+        )
+        if transposition_pitch.cents > 600:
+            transposition_pitch = transposition_pitch.register(-1)
+
+        melody_pitches = tuple(
+            p if p.is_empty else p + transposition_pitch for p in melody_pitches
+        )
+
+        if self._gender:
+            melody_pitches = tuple(
+                p if p.is_empty else p.inverse(transposition_pitch)
+                for p in melody_pitches
+            )
+
+        distributed_beats = tools.euclid(
+            self._n_bars * self._metrical_numbers[0], sum(self._melody_beats)
+        )
+        absolute_rhythms = tools.accumulate_from_zero(self._melody_beats)
+        distributed_rhythms = tuple(
+            sum(distributed_beats[pos0:pos1])
+            for pos0, pos1 in zip(absolute_rhythms, absolute_rhythms[1:])
+        )
+        absolute_rhythms = tools.accumulate_from_zero(distributed_rhythms)
+        rhythms = tuple(
+            sum(self._rhythms[0][pos0:pos1])
+            for pos0, pos1 in zip(absolute_rhythms, absolute_rhythms[1:])
+        )
+
+        return old.Melody(tuple(map(old.Tone, melody_pitches, rhythms)))
+
+    def make_counterpoint_result(self) -> tuple:
+        self._predefined_voices = (self.make_melody(),)
+        self._rhythms = self._rhythms[1:]
+
+        return super().make_counterpoint_result()

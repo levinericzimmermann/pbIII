@@ -99,6 +99,7 @@ class _AbstractInstrument(metaclass=_MetaSample):
         score_lines = self.make_score_lines(instrument_idx, start, duration, **kwargs)
         return instrument, score_lines
 
+
 class Sample(_AbstractInstrument):
     _basic_args = tuple([])
     _infit_args = {
@@ -113,9 +114,18 @@ class Sample(_AbstractInstrument):
         "channels": (tuple, type(None)),
         # float to skip n seconds of the sample or None for starting at the beginning
         "skip_time": (float, type(None)),
-        #############################################################################
-        ############## EFFECTS ######################################################
-        #############################################################################
+        # size of glissando
+        "glissando_size": (float, type(None)),
+        # duration of glissando
+        "glissando_duration": (float, type(None)),
+        # time until glissando starts
+        "glissando_offset": (float, type(None)),
+        # True -> from glissando position to original pitch
+        # False -> from original pitch position to glissando pitch position
+        "glissando_direction": (bool, type(None)),
+        # ############################################################################
+        # ############# EFFECTS ######################################################
+        # ############################################################################
         # float for having a resonance filter at the particular frequency or None if no
         # resonance filter shall be used
         "resonance_filter_frequency": (float, type(None)),
@@ -177,14 +187,14 @@ class Sample(_AbstractInstrument):
             argument_values = {
                 arg: kwargs[arg] for arg in arguments if type(arg) is str
             }
-            if all(tuple(argument_values[arg] != None for arg in argument_values)):
+            if all(tuple(argument_values[arg] is not None for arg in argument_values)):
 
                 if effect == "distort":
                     dist_table_name = "iDistTable"
-                    dist_func_table = "{} ftgenonce 0,0, 257, 9, .5,1,270,1.5,.33,90,".format(
+                    dist_func_table = "{} ftgenonce 0,0, 257, 9, .5,1,270,".format(
                         dist_table_name
                     )
-                    dist_func_table += "2.5,.2,270,3.5,.143,90,4.5,.111,270"
+                    dist_func_table += "1.5,.33,90,2.5,.2,270,3.5,.143,90,4.5,.111,270"
                     effect_lines.append(dist_func_table)
                     arguments += (dist_table_name,)
 

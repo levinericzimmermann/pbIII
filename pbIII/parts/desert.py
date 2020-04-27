@@ -22,6 +22,7 @@ GROUP = 2
 # GROUP = 3
 SUB_GROUP0 = 0
 
+"""
 # high glitter
 GENDER = False
 GROUP = 3
@@ -40,7 +41,8 @@ PART = (
         dynamic_range_of_voices=(0.1, 0.2),
         anticipation_time=1.75,
         overlaying_time=1.25,
-        cp_add_dissonant_pitches_to_nth_voice=(False, False, True),
+        # cp_add_dissonant_pitches_to_nth_voice=(False, False, True),
+        cp_add_dissonant_pitches_to_nth_voice=(True, True, True),
         cp_constraints_harmonic=(
             counterpoint.constraints.HR_forbid_too_empty_harmonies(1, [0]),
         ),
@@ -51,14 +53,17 @@ PART = (
                 fxp='"pbIII/fxp/VibraphoneV-BHumanizednostretching.fxp"',
                 preset=None,
                 empty_attack_dynamic_maker=infit.Value(0),
+                convert_dissonant_tones2glissandi=True,
             ),
             pteq.mk_dreamy_pte(
                 empty_attack_dynamic_maker=infit.Value(0),
                 modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                convert_dissonant_tones2glissandi=True,
             ),
             pteq.mk_dreamy_pte(
                 empty_attack_dynamic_maker=infit.Value(0),
                 modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                convert_dissonant_tones2glissandi=True,
             ),
         ),
         speech_init_attributes={},
@@ -93,7 +98,8 @@ PART = (
             counterpoint.constraints.HR_forbid_too_empty_harmonies(1, [0]),
         ),
         cp_constraints_interpolation=[],
-        cp_add_dissonant_pitches_to_nth_voice=(False, False, False),
+        # cp_add_dissonant_pitches_to_nth_voice=(False, False, False),
+        cp_add_dissonant_pitches_to_nth_voice=(True, True, True),
         pteq_engine_per_voice=(
             pteq.mk_super_dreamy_pte(
                 empty_attack_dynamic_maker=infit.Value(0),
@@ -102,6 +108,7 @@ PART = (
                         maxima_glissando_duration=0.35, maxima_glissando_size=180
                     ),
                 ),
+                convert_dissonant_tones2glissandi=True,
             ),
             pteq.mk_super_dreamy_pte(
                 empty_attack_dynamic_maker=infit.Value(0),
@@ -110,6 +117,7 @@ PART = (
                         maxima_glissando_duration=0.35, maxima_glissando_size=180
                     ),
                 ),
+                convert_dissonant_tones2glissandi=True,
             ),
             pteq.mk_super_dreamy_pte(
                 empty_attack_dynamic_maker=infit.Value(0),
@@ -118,6 +126,7 @@ PART = (
                         maxima_glissando_duration=0.35, maxima_glissando_size=180
                     ),
                 ),
+                convert_dissonant_tones2glissandi=True,
             ),
         ),
         speech_init_attributes={},
@@ -302,6 +311,7 @@ PART = (
         radio_min_volume=0.7,
     ),
 )
+"""
 
 
 """
@@ -570,8 +580,8 @@ PART = (
         "{}_1".format(NAME),
         ambitus_maker=ambitus.SymmetricalRanges(ji.r(1, 1), ji.r(3, 1), ji.r(5, 4)),
         decision_type="activity",
-        energy_per_voice=(10, 10, 10),
-        weight_range=(2, 10),
+        energy_per_voice=(7, 10, 6),
+        weight_range=(4, 10),
         metrical_numbers=(6, 12, 18),
         silence_decider_per_voice=(
             infit.ActivityLevel(1),
@@ -610,6 +620,7 @@ PART = (
                                 "frequency"
                             ],
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            distortion=infit.Uniform(0, 1),
                         ),
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET),
@@ -617,6 +628,7 @@ PART = (
                                 "frequency"
                             ],
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            distortion=infit.Uniform(0, 1),
                         ),
                     )
                 ),
@@ -641,6 +653,7 @@ PART = (
                                 "frequency"
                             ],
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            distortion=infit.Uniform(0, 1),
                         ),
                     )
                 ),
@@ -658,6 +671,7 @@ PART = (
                                 "frequency"
                             ],
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            distortion=infit.Uniform(0, 1),
                         ),
                         percussion.Sample(
                             path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET),
@@ -697,3 +711,302 @@ PART = (
     ),
 )
 """
+
+
+# Superorganism test
+GENDER = True
+GROUP = 4
+SUB_GROUP0 = 0
+PART = (
+    segments.MelodicCP(
+        "{}_1".format(NAME),
+        ambitus_maker=ambitus.SymmetricalRanges(ji.r(1, 1), ji.r(4, 1), ji.r(5, 4)),
+        random_seed=1000,
+        # metrical_numbers=(3, 9, 12),
+        # metrical_numbers=(16, 16, 16),
+        group=(GROUP, SUB_GROUP0, 0),
+        action_per_voice=(0.7, 0.7),
+        sound_per_voice=(0.95, 0.75),
+        phrases=(0, 1, 2, 3),
+        melody_register=-1,
+        melodic_weight=0,
+        weight_range=(0.3, 1),
+        harmonicity_range=(0.25, 1),
+        gender=GENDER,
+        n_bars=5,
+        duration_per_bar=7,
+        start=0,
+        dynamic_range_of_voices=(0.075, 0.785),
+        anticipation_time=0.3,
+        overlaying_time=0.35,
+        pteq_engine_per_voice=(
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+                fxp='"pbIII/fxp/VibraphoneV-BHumanizednostretching.fxp"',
+                preset=None,
+            ),
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+            ),
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+            ),
+        ),
+        percussion_engine_per_voice=(
+            percussion.Rhythmizer(
+                voice_meters2occupy=(0,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.8),
+                ignore_beats_occupied_by_voice=False,
+            ),
+            percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_HIGH_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_LOW_HIGH_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.35),
+                ignore_beats_occupied_by_voice=False,
+            ),
+            percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_FAR_MALLET),
+                            frequency=globals.SAM_KENDANG_LOW_LOW_FAR_MALLET.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((2, 1, 2, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.35),
+                ignore_beats_occupied_by_voice=False,
+            ),
+        ),
+        speech_init_attributes={},
+        include_glitter=True,
+        include_diva=True,
+        include_natural_radio=True,
+        include_percussion=False,
+        radio_silent_channels=(1, 3, 5),
+        radio_samples=(
+            "pbIII/samples/radio/carolina/3.wav",
+            "pbIII/samples/radio/carolina/1.wav",
+        ),
+        radio_n_changes=1,
+        radio_average_volume=0.095,
+        radio_shadow_time=0.085,
+        radio_min_volume=0.825,
+    ),
+    segments.Superorganism(
+        "{}_0".format(NAME),
+        ambitus_maker=ambitus.SymmetricalRanges(ji.r(1, 1), ji.r(4, 1), ji.r(5, 4)),
+        random_seed=1000,
+        # metrical_numbers=(3, 9, 12),
+        # metrical_numbers=(16, 16, 16),
+        group=(GROUP, SUB_GROUP0, 0),
+        action_per_voice=(1, 1, 1),
+        sound_per_voice=(0.9, 0.95, 0.75),
+        melodic_weight=0,
+        weight_range=(0.3, 1),
+        harmonicity_range=(0.25, 1),
+        gender=GENDER,
+        # n_bars=5,
+        n_bars=1,
+        duration_per_bar=4,
+        start=3,
+        dynamic_range_of_voices=(0.075, 0.785),
+        anticipation_time=0.3,
+        overlaying_time=0.35,
+        pteq_engine_per_voice=(
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+            ),
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+            ),
+            pteq.mk_dreamy_pte(
+                # modulator=(ornamentations.SoftLineGlissandoMaker(),),
+                empty_attack_dynamic_maker=infit.Value(0.2),
+            ),
+        ),
+        percussion_engine_per_voice=(
+            percussion.Rhythmizer(
+                voice_meters2occupy=(0,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.8),
+                ignore_beats_occupied_by_voice=False,
+            ),
+            percussion.Rhythmizer(
+                voice_meters2occupy=(1,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_HIGH_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_LOW_HIGH_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.35),
+                ignore_beats_occupied_by_voice=False,
+            ),
+            percussion.Rhythmizer(
+                voice_meters2occupy=(2,),
+                sample_maker=infit.Cycle(
+                    (
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_FAR_MALLET),
+                            frequency=globals.SAM_KENDANG_LOW_LOW_FAR_MALLET.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                        ),
+                        percussion.Sample(
+                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
+                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
+                                "frequency"
+                            ],
+                            pitch_factor=infit.Cycle((2, 1, 2, 1)),
+                        ),
+                    )
+                ),
+                likelihood_range=(0.3, 0.5),
+                volume_range=(0.1, 0.35),
+                ignore_beats_occupied_by_voice=False,
+            ),
+        ),
+        speech_init_attributes={},
+        include_glitter=True,
+        include_diva=True,
+        include_natural_radio=True,
+        include_percussion=False,
+        radio_silent_channels=(1, 3, 5),
+        radio_samples=(
+            "pbIII/samples/radio/carolina/3.wav",
+            "pbIII/samples/radio/carolina/1.wav",
+        ),
+        radio_n_changes=1,
+        radio_average_volume=0.095,
+        radio_shadow_time=0.085,
+        radio_min_volume=0.825,
+    ),
+)

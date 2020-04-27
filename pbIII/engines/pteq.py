@@ -3,16 +3,21 @@ import subprocess
 from mutools import pteqer
 from mutools import synthesis
 
+from mu.mel import mel
 from mu.mel import ji
 from mu.midiplug import midiplug
 from mu.rhy import binr
 from mu.sco import old
 from mu.utils import infit
+from mu.utils import interpolations
+from mu.utils import tools
 
 from pbIII.globals import globals
 
 
 class __PianoteqVoice(synthesis.SoundEngine):
+    glissando_duration = 0.5  # seconds
+
     def __init__(
         self,
         tempo_factor: float,
@@ -42,6 +47,9 @@ class __PianoteqVoice(synthesis.SoundEngine):
                 for p, r, v in zip(self.__pitches, adapted_rhythms, self.__dynamics)
             )
         )
+
+        if self.convert_dissonant_tones2glissandi:
+            melody = self._convert_dissonant_tones2glissandi(melody)
 
         for modulator in self.modulator:
             melody = modulator(melody)
@@ -108,6 +116,81 @@ class __PianoteqVoice(synthesis.SoundEngine):
         pteq = midiplug.Pianoteq(tuple(sequence))
         return pteq.export2wav(path, preset=self.preset, fxp=self.fxp)
 
+    def _convert_dissonant_tones2glissandi(self, melody: old.Melody):
+        consonant_tones_positions = tools.find_all_indices_of_n(
+            True, self.__is_not_dissonant_pitch_per_tone
+        )
+        new_melody = melody[: consonant_tones_positions[0]].copy()
+
+        consonant_and_its_dissonant_tones = tuple(
+            (melody[idx0], melody[idx0 + 1 : idx1])
+            for idx0, idx1 in zip(
+                consonant_tones_positions,
+                consonant_tones_positions[1:] + (len(melody),),
+            )
+        )
+
+        for main_and_its_side_tones in consonant_and_its_dissonant_tones:
+            main_tone, additional_tones = main_and_its_side_tones
+            if not main_tone.pitch.is_empty:
+                duration_per_pitch = (main_tone.duration,) + tuple(
+                    t.duration for t in additional_tones
+                )
+                summed_duration = sum(duration_per_pitch)
+
+                glissando = []
+                for t0, t1 in zip(
+                    (main_tone,) + tuple(additional_tones), additional_tones
+                ):
+
+                    pitch_difference = t0.pitch - main_tone.pitch
+                    duration = t0.duration
+
+                    if duration > self.glissando_duration:
+                        staying = duration - self.glissando_duration
+                        changing = self.glissando_duration
+                    else:
+                        staying = duration * 0.5
+                        changing = float(staying)
+
+                    glissando.append(old.PitchInterpolation(staying, pitch_difference))
+                    glissando.append(old.PitchInterpolation(changing, pitch_difference))
+
+                last_pitch = mel.TheEmptyPitch
+                last_pitch_idx = -1
+                while last_pitch.is_empty:
+                    try:
+                        last_pitch = additional_tones[last_pitch_idx].pitch
+                    except IndexError:
+                        last_pitch = None
+                        break
+                    last_pitch_idx -= 1
+
+                if last_pitch is not None:
+                    pitch_difference = last_pitch - main_tone.pitch
+                    glissando.append(old.PitchInterpolation(0, pitch_difference))
+                    glissando = old.GlissandoLine(
+                        interpolations.InterpolationLine(glissando)
+                    )
+                else:
+                    glissando = None
+
+                print(glissando)
+
+                new_tone = old.Tone(
+                    main_tone.pitch,
+                    delay=summed_duration,
+                    duration=summed_duration,
+                    glissando=glissando,
+                )
+
+                new_melody.append(new_tone)
+
+            else:
+                new_melody.extend((main_tone,) + tuple(additional_tones))
+
+        return new_melody
+
 
 # Functions for generating pianoteq voice classes
 __STANDARD_PRESET = '"Concert Harp Daily"'
@@ -121,6 +204,7 @@ def mk_pianoteq_engine(
     parameter_dissonant_pitches: dict = {},
     empty_attack_dynamic_maker: infit.InfIt = infit.Uniform(0.2, 0.4),
     modulator: tuple = tuple([]),
+    convert_dissonant_tones2glissandi: bool = False,
 ) -> type:
 
     assert fxp is None or preset is None
@@ -146,6 +230,7 @@ def mk_pianoteq_engine(
         "parameter_non_dissonant_pitches": parameter_non_dissonant_pitches,
         "empty_attack_dynamic_maker": empty_attack_dynamic_maker,
         "modulator": modulator,
+        "convert_dissonant_tones2glissandi": convert_dissonant_tones2glissandi,
     }
     return type("PianoteqVoice", (__PianoteqVoice,), attributes)
 
