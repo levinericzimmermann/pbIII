@@ -748,42 +748,27 @@ PART = (
             ),
             pteq.mk_dreamy_pte(
                 # modulator=(ornamentations.SoftLineGlissandoMaker(),),
-                empty_attack_dynamic_maker=infit.Value(0.2),
+                empty_attack_dynamic_maker=infit.Value(0.2)
             ),
             pteq.mk_dreamy_pte(
                 # modulator=(ornamentations.SoftLineGlissandoMaker(),),
-                empty_attack_dynamic_maker=infit.Value(0.2),
+                empty_attack_dynamic_maker=infit.Value(0.2)
             ),
         ),
         percussion_engine_per_voice=(
             percussion.Rhythmizer(
-                voice_meters2occupy=(0,),
+                voice_meters2occupy=(0, 1, 2),
                 sample_maker=infit.Cycle(
                     (
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND),
-                            frequency=globals.SAM_KENDANG_LOW_LOW_CLOSE_HAND.information[
-                                "frequency"
-                            ],
+                        percussion.ResonanceSample(
+                            path=infit.Cycle(globals.SAM_CYMBALS_BIG_AGGRESSIVE),
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND),
-                            frequency=globals.SAM_KENDANG_HIGH_LOW_CLOSE_HAND.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
-                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            resonance_filter_bandwidth=infit.Uniform(10, 20),
+                            resonance_filter_octave=infit.Cycle((1, 2, 1, 3, 0, 1, 2)),
                         ),
                     )
                 ),
-                likelihood_range=(0.3, 0.5),
+                likelihood_range=(0.5, 0.8),
                 volume_range=(0.1, 0.8),
                 ignore_beats_occupied_by_voice=False,
             ),
@@ -791,62 +776,32 @@ PART = (
                 voice_meters2occupy=(1,),
                 sample_maker=infit.Cycle(
                     (
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_LOW_HIGH_FAR_HAND),
-                            frequency=globals.SAM_KENDANG_LOW_HIGH_FAR_HAND.information[
-                                "frequency"
-                            ],
+                        percussion.ResonanceSample(
+                            path=infit.Cycle(globals.SAM_CYMBALS_BIG_CLOSE),
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
-                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND),
-                            frequency=globals.SAM_KENDANG_HIGH_HIGH_CLOSE_HAND.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
+                            resonance_filter_bandwidth=infit.Uniform(10, 20),
+                            resonance_filter_octave=infit.Cycle((1, 2, 1, 3, 0, 1, 2)),
                         ),
                     )
                 ),
-                likelihood_range=(0.3, 0.5),
-                volume_range=(0.1, 0.35),
+                likelihood_range=(0.5, 1),
+                volume_range=(0.1, 0.8),
                 ignore_beats_occupied_by_voice=False,
             ),
             percussion.Rhythmizer(
                 voice_meters2occupy=(2,),
                 sample_maker=infit.Cycle(
                     (
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_LOW_LOW_FAR_MALLET),
-                            frequency=globals.SAM_KENDANG_LOW_LOW_FAR_MALLET.information[
-                                "frequency"
-                            ],
+                        percussion.ResonanceSample(
+                            path=infit.Cycle(globals.SAM_CYMBALS_MIDDLE_AGGRESSIVE),
                             pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET),
-                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_MALLET.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((0.5, 1, 0.25, 1)),
-                        ),
-                        percussion.Sample(
-                            path=infit.Cycle(globals.SAM_KENDANG_HIGH_LOW_FAR_HAND),
-                            frequency=globals.SAM_KENDANG_HIGH_LOW_FAR_HAND.information[
-                                "frequency"
-                            ],
-                            pitch_factor=infit.Cycle((2, 1, 2, 1)),
+                            resonance_filter_bandwidth=infit.Uniform(10, 20),
+                            resonance_filter_octave=infit.Cycle((1, 2, 1, 3, 0, 1, 2)),
                         ),
                     )
                 ),
-                likelihood_range=(0.3, 0.5),
-                volume_range=(0.1, 0.35),
+                likelihood_range=(0.5, 1),
+                volume_range=(0.1, 0.8),
                 ignore_beats_occupied_by_voice=False,
             ),
         ),
@@ -854,7 +809,7 @@ PART = (
         include_glitter=True,
         include_diva=True,
         include_natural_radio=True,
-        include_percussion=False,
+        include_percussion=True,
         radio_silent_channels=(1, 3, 5),
         radio_samples=(
             "pbIII/samples/radio/carolina/3.wav",
@@ -888,15 +843,15 @@ PART = (
         pteq_engine_per_voice=(
             pteq.mk_dreamy_pte(
                 # modulator=(ornamentations.SoftLineGlissandoMaker(),),
-                empty_attack_dynamic_maker=infit.Value(0.2),
+                empty_attack_dynamic_maker=infit.Value(0.2)
             ),
             pteq.mk_dreamy_pte(
                 # modulator=(ornamentations.SoftLineGlissandoMaker(),),
-                empty_attack_dynamic_maker=infit.Value(0.2),
+                empty_attack_dynamic_maker=infit.Value(0.2)
             ),
             pteq.mk_dreamy_pte(
                 # modulator=(ornamentations.SoftLineGlissandoMaker(),),
-                empty_attack_dynamic_maker=infit.Value(0.2),
+                empty_attack_dynamic_maker=infit.Value(0.2)
             ),
         ),
         percussion_engine_per_voice=(

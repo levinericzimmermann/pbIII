@@ -1,4 +1,5 @@
 import abc
+import collections
 import functools
 import operator
 
@@ -34,11 +35,13 @@ class _MetaSample(type):
                             isinstance(arg_value, allowed_class)
                             for allowed_class in self._infit_args[arg_name]
                         )
+
                         if any(tests):
                             arg_value = infit.Value(arg_value)
+
                         else:
-                            msg = "Type of argument '{}' is '{}', ".format(
-                                arg_name, type(arg_value)
+                            msg = "Type of argument '{}' (value '{}') is '{}', ".format(
+                                arg_name, arg_value, type(arg_value)
                             )
                             msg += "while only '{}' are allowed types.".format(
                                 self._infit_args[arg_name]
@@ -106,20 +109,20 @@ class Sample(_AbstractInstrument):
         # path of the sample
         "path": (str,),
         # either float (Hz) or if there isn't any certain detectable frequency set to None
-        "frequency": (float, type(None)),
+        "frequency": (float, int, type(None)),
         # multipy pitch
-        "pitch_factor": (float, type(None)),
+        "pitch_factor": (float, int, type(None)),
         # tuple to tell which channels to use and None if all channels shall be used (and
         # mixed down to mono source)
         "channels": (tuple, type(None)),
         # float to skip n seconds of the sample or None for starting at the beginning
-        "skip_time": (float, type(None)),
+        "skip_time": (float, int, type(None)),
         # size of glissando
-        "glissando_size": (float, type(None)),
+        "glissando_size": (float, int, type(None)),
         # duration of glissando
-        "glissando_duration": (float, type(None)),
+        "glissando_duration": (float, int, type(None)),
         # time until glissando starts
-        "glissando_offset": (float, type(None)),
+        "glissando_offset": (float, int, type(None)),
         # True -> from glissando position to original pitch
         # False -> from original pitch position to glissando pitch position
         "glissando_direction": (bool, type(None)),
@@ -161,6 +164,66 @@ class Sample(_AbstractInstrument):
         "volume": 1,
     }
 
+    @staticmethod
+    def _make_pitch_interpolation(kwargs: dict) -> str:
+        if kwargs["pitch_factor"] is None:
+            pitch_factor = 1
+        else:
+            pitch_factor = kwargs["pitch_factor"]
+
+        if kwargs["frequency"] is not None and kwargs["pitch"] is not None:
+
+            if isinstance(kwargs["pitch"], float):
+                pitch_factor *= kwargs["pitch"] / kwargs["frequency"]
+
+            elif hasattr(kwargs["pitch"], "__getitem__"):
+                pitch_factor_ = tools.find_closest_item(
+                    kwargs["frequency"], kwargs["pitch"]
+                )
+                pitch_factor_ /= kwargs["frequency"]
+                pitch_factor *= pitch_factor_
+
+            else:
+                msg = "Unknown type '{}' for 'pitch' with value '{}'".format(
+                    type(kwargs["pitch"]), kwargs["pitch"]
+                )
+                raise TypeError(msg)
+
+        if all(
+            tuple(
+                kwargs[arg] is not None
+                for arg in (
+                    "glissando_size",
+                    "glissando_duration",
+                    "glissando_offset",
+                    "glissando_direction",
+                )
+            )
+        ):
+            glissando_pitch_factor = pitch_factor * kwargs["glissando_size"]
+
+            if kwargs["glissando_direction"]:
+                start_factor, end_factor = glissando_pitch_factor, pitch_factor
+            else:
+                end_factor, start_factor = glissando_pitch_factor, pitch_factor
+
+            pitch_interpolation = "kPitch linseg "
+
+            glissando_offset = kwargs["glissando_offset"]
+            if glissando_offset > 0:
+                pitch_interpolation += "{0}, {1}, ".format(
+                    start_factor, glissando_offset
+                )
+
+            pitch_interpolation += "{0}, {1}, {2}".format(
+                start_factor, kwargs["glissando_duration"], end_factor
+            )
+
+        else:
+            pitch_interpolation = "kPitch linseg {0}, p3, {0}".format(pitch_factor)
+
+        return pitch_interpolation
+
     def instrument(self, instrument_idx: int, **kwargs) -> tuple:
         n_channels = synthesis.pyo.sndinfo(kwargs["path"])[3]
 
@@ -170,7 +233,12 @@ class Sample(_AbstractInstrument):
             channel2use = kwargs["channels"]
 
         name_of_signals = tuple("aSignal{}".format(idx) for idx in range(n_channels))
-        diskin2 = "{} diskin2 p4, p5, p6, 0, 6, 4".format(", ".join(name_of_signals))
+
+        pitch_interpolation = self._make_pitch_interpolation(kwargs)
+
+        diskin2 = "{} diskin2 p4, kPitch, p5, 0, 6, 4".format(
+            ", ".join(name_of_signals)
+        )
         summarized = " + ".join(
             tuple(
                 signal
@@ -217,11 +285,11 @@ class Sample(_AbstractInstrument):
         else:
             balance = ""
 
-        out = "out {} * p7".format(last_signal)
+        out = "out {} * p6".format(last_signal)
 
         top_definition = super().instrument(instrument_idx)
 
-        lines = (top_definition[0], diskin2, summarized)
+        lines = (top_definition[0], pitch_interpolation, diskin2, summarized)
         lines += tuple(effect_lines)
         lines += (balance, out, top_definition[-1])
         return lines
@@ -232,44 +300,63 @@ class Sample(_AbstractInstrument):
         # set duration to sample duration
         duration = synthesis.pyo.sndinfo(kwargs["path"])[1]
 
-        if kwargs["pitch_factor"] is None:
-            pitch_factor = 1
-        else:
-            pitch_factor = kwargs["pitch_factor"]
-
-        if kwargs["frequency"] is not None and kwargs["pitch"] is not None:
-
-            if isinstance(kwargs["pitch"], float):
-                pitch_factor *= kwargs["pitch"] / kwargs["frequency"]
-
-            elif hasattr(kwargs["pitch"], "__getitem__"):
-                pitch_factor_ = tools.find_closest_item(
-                    kwargs["frequency"], kwargs["pitch"]
-                )
-                pitch_factor_ /= kwargs["frequency"]
-                pitch_factor *= pitch_factor_
-
-            else:
-                msg = "Unknown type '{}' for 'pitch' with value '{}'".format(
-                    type(kwargs["pitch"]), kwargs["pitch"]
-                )
-                raise TypeError(msg)
-
         if kwargs["skip_time"] is None:
             skip_time = 0
         else:
             skip_time = kwargs["skip_time"]
 
-        line = 'i{} {} {} "{}" {} {} {}'.format(
-            instrument_idx,
-            start,
-            duration,
-            kwargs["path"],
-            pitch_factor,
-            skip_time,
-            kwargs["volume"],
+        line = 'i{} {} {} "{}" {} {}'.format(
+            instrument_idx, start, duration, kwargs["path"], skip_time, kwargs["volume"]
         )
         return (line,)
+
+
+class ResonanceSample(Sample):
+    _infit_args = dict(Sample._infit_args)
+    _infit_args.update({"resonance_filter_octave": (int,)})
+
+    _oct_border = (globals.CONCERT_PITCH, globals.CONCERT_PITCH * 2)
+
+    def __call__(
+        self, instrument_idx: int, start: float, duration: float, **kwargs
+    ) -> tuple:
+        try:
+            self._pitch_counter
+        except AttributeError:
+            self._pitch_counter = collections.Counter([])
+
+        pitch_data = kwargs["pitch"]
+
+        # making sure there is any data
+        assert pitch_data
+
+        relevant_pitch_data = tuple(
+            p
+            for p in pitch_data
+            if p >= self._oct_border[0] and p <= self._oct_border[1]
+        )
+        pitch_counter_pairs = tuple(
+            (self._pitch_counter[p], p) for p in relevant_pitch_data
+        )
+        choosen_pitch = sorted(pitch_counter_pairs, key=operator.itemgetter(0))[0][1]
+
+        self._pitch_counter.update({choosen_pitch: 1})
+        kwargs["resonance_filter_frequency"] = choosen_pitch * (
+            2 ** next(self.resonance_filter_octave)
+        )
+        kwargs["pitch"] = None
+
+        for arg in self._infit_args:
+            if arg != "resonance_filter_frequency":
+                kwargs.update({arg: next(getattr(self, arg))})
+
+        for arg in self._upper_args:
+            if arg not in kwargs:
+                kwargs.update({arg: self._upper_args[arg]})
+
+        instrument = self.instrument(instrument_idx, **kwargs)
+        score_lines = self.make_score_lines(instrument_idx, start, duration, **kwargs)
+        return instrument, score_lines
 
 
 class Rhythmizer(synthesis.BasedCsoundEngine):
@@ -277,7 +364,7 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
     remove_files = True
 
     #########################################################################
-    #       ATTRIBUTES THAT HAVE TO GET INITALISED BY SEGMENT CLASS          #
+    #       ATTRIBUTES THAT HAVE TO GET INITALISED BY SEGMENT CLASS         #
     #########################################################################
 
     # segment class
@@ -328,13 +415,23 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
         likelihood_range: tuple = (0.79, 1),
         volume_range: tuple = (0.5, 1),
         seed: int = 100,
-        chord: tuple = harmony.find_harmony(),
+        chord: infit.InfIt = harmony.find_harmony(),
         ignore_beats_occupied_by_voice: bool = True,
         voices2ignore: tuple = None,
         octaves: tuple = tuple(range(-3, 4)),
     ):
         if voices2ignore is None:
             voices2ignore = voice_meters2occupy
+
+        if type(chord) is tuple:
+            chord = infit.Value(chord)
+
+        elif isinstance(chord, infit.InfIt):
+            pass
+
+        else:
+            msg = "Wrong type '{}' for chord '{}'.".format(type(chord), chord)
+            raise TypeError(msg)
 
         self._voices2ignore = voices2ignore
         self._voice_meters2occupy = voice_meters2occupy
@@ -436,19 +533,6 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
     def make_data(self) -> tuple:
         """set orc and sco attributes."""
 
-        valid_pitches = functools.reduce(
-            operator.add,
-            tuple(
-                tuple(
-                    ji.JIPitch(p, multiply=globals.CONCERT_PITCH).register(octave).freq
-                    for octave in self._octaves
-                )
-                for p in self._chord[0](
-                    *globals.MALE_SOIL.harmonic_primes_per_bar[self.segment._bar_number]
-                )
-            ),
-        )
-
         start_per_attack, duration_per_attack, volume_per_attack = (
             self.find_start_and_duration_and_volume()
         )
@@ -462,6 +546,23 @@ class Rhythmizer(synthesis.BasedCsoundEngine):
             duration_per_attack,
             volume_per_attack,
         ):
+
+            valid_pitches = functools.reduce(
+                operator.add,
+                tuple(
+                    tuple(
+                        ji.JIPitch(p, multiply=globals.CONCERT_PITCH)
+                        .register(octave)
+                        .freq
+                        for octave in self._octaves
+                    )
+                    for p in next(self._chord)[0](
+                        *globals.MALE_SOIL.harmonic_primes_per_bar[
+                            self.segment._bar_number
+                        ]
+                    )
+                ),
+            )
             orc_data, sco_data = next(self._sample_maker)(
                 instrument_idx=instr_idx + 1,
                 start=start,
