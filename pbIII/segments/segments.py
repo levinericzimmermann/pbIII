@@ -3,7 +3,6 @@ import functools
 import itertools
 import math
 import operator
-
 from mu.mel import ji
 from mu.mel import mel
 from mu.rhy import binr
@@ -21,6 +20,7 @@ from mutools import organisms
 from mutools import polyrhythms
 from mutools import pteqer
 from mutools import schillinger
+from mutools import synthesis
 
 from pbIII.fragments import harmony
 from pbIII.globals import globals
@@ -32,7 +32,7 @@ from pbIII.engines import pteq
 from pbIII.engines import radio
 
 
-class CyclicPermutation(object):
+class _CyclicPermutation(object):
     """Helper class for distributing natural radio sounds on different speaker."""
 
     def __init__(self, pattern: tuple) -> None:
@@ -40,7 +40,7 @@ class CyclicPermutation(object):
         self.__pattern = pattern
 
     def __repr__(self) -> str:
-        return "CyclicPermutation({})".format(self.pattern)
+        return "_CyclicPermutation({})".format(self.pattern)
 
     def __next__(self) -> tuple:
         return next(self.__cycle)
@@ -48,6 +48,22 @@ class CyclicPermutation(object):
     @property
     def pattern(self) -> tuple:
         return self.__pattern
+
+
+class Silence(MU.Segment):
+    orchestration = globals.PBIII_ORCHESTRATION
+
+    def __init__(self, name: str, start: float = 0, duration: float = 5) -> None:
+        init_attributes = {
+            self.orchestration[0].name: {
+                "start": 0,
+                "duration": duration,
+                "sound_engine": synthesis.SilenceEngine(duration),
+            }
+        }
+        super().__init__(
+            name=name, start=start, tracks2ignore=tuple([]), **init_attributes
+        )
 
 
 class PBIII_Segment(MU.Segment):
@@ -62,6 +78,8 @@ class PBIII_Segment(MU.Segment):
         self,
         name: str,
         tracks2ignore=tuple([]),
+        volume_envelope=None,
+        volume_envelope_per_track=dict([]),
         rhythm_maker=None,
         start: float = 0,
         group: tuple = (0, 0, 0),
@@ -261,7 +279,12 @@ class PBIII_Segment(MU.Segment):
         init_attributes.update(speech_init_attributes)
 
         super().__init__(
-            name=name, start=start, tracks2ignore=tracks2ignore, **init_attributes
+            name=name,
+            start=start,
+            tracks2ignore=tracks2ignore,
+            volume_envelope=volume_envelope,
+            volume_envelope_per_track=volume_envelope_per_track,
+            **init_attributes,
         )
 
     @staticmethod
@@ -330,7 +353,7 @@ class PBIII_Segment(MU.Segment):
                 voice[2],
                 volume_per_tone,
                 spectrum_profile_per_tone,
-                self._voices_overlaying_time,
+                overlaying_time=self._voices_overlaying_time,
             )
 
             voice_name = "voice{}{}".format(self._gender_code, v_idx)
@@ -474,13 +497,16 @@ class PBIII_Segment(MU.Segment):
         sample_distributer_cycle = itertools.cycle(
             (
                 # for one sample
-                (CyclicPermutation((0,) * 6),),
+                (_CyclicPermutation((0,) * 6),),
                 # for two samples
-                (CyclicPermutation((0, 1) * 3), CyclicPermutation((0, 0, 1, 0, 1, 1))),
+                (
+                    _CyclicPermutation((0, 1) * 3),
+                    _CyclicPermutation((0, 0, 1, 0, 1, 1)),
+                ),
                 # for three samples
                 (
-                    CyclicPermutation((0, 1, 2, 2, 1, 0)),
-                    CyclicPermutation((0, 1, 2, 0, 1, 2)),
+                    _CyclicPermutation((0, 1, 2, 2, 1, 0)),
+                    _CyclicPermutation((0, 1, 2, 0, 1, 2)),
                 ),
             )[n_samples - 1]
         )

@@ -248,10 +248,10 @@ GLITTER_VOLUME = 0.0475
 VOICE_VOLUME = 1.6
 DIVA_VOLUME = 0.22
 NATURAL_RADIO_VOLUME = 0.085
-SPEECH_VOLUME = 0.15
+SPEECH_VOLUME = 0.25
 PERCUSSION_VOLUME = 0.68
 
-GENERAL_FACTOR = 0.775
+GENERAL_FACTOR = 0.52
 
 GLITTER_VOLUME *= GENERAL_FACTOR
 VOICE_VOLUME *= GENERAL_FACTOR
@@ -335,6 +335,10 @@ class _Samples(object):
         self.__samples = samples
         self.__path = dictionary_path
         self.__information = information
+
+    @property
+    def path(self) -> str:
+        return self.__path
 
     @property
     def information(self) -> dict:

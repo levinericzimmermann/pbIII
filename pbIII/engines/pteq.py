@@ -29,6 +29,9 @@ class __PianoteqVoice(synthesis.SoundEngine):
         overlaying_time: float = 0,
     ):
 
+        assert len(pitches) == len(is_not_dissonant_pitch_per_tone)
+        assert len(pitches) == len(rhythm)
+
         self.__tempo_factor = tempo_factor
         self.__pitches = pitches
         self.__overlaying_time = overlaying_time
@@ -122,11 +125,13 @@ class __PianoteqVoice(synthesis.SoundEngine):
         )
         new_melody = melody[: consonant_tones_positions[0]].copy()
 
+        melody_size = len(melody)
+
         consonant_and_its_dissonant_tones = tuple(
             (melody[idx0], melody[idx0 + 1 : idx1])
             for idx0, idx1 in zip(
                 consonant_tones_positions,
-                consonant_tones_positions[1:] + (len(melody),),
+                consonant_tones_positions[1:] + (melody_size,),
             )
         )
 
@@ -174,8 +179,6 @@ class __PianoteqVoice(synthesis.SoundEngine):
                     )
                 else:
                     glissando = None
-
-                print(glissando)
 
                 new_tone = old.Tone(
                     main_tone.pitch,
@@ -236,7 +239,11 @@ def mk_pianoteq_engine(
 
 
 def mk_contrasting_pte(
-    preset: str = __STANDARD_PRESET, fxp: str = __STANDARD_FXP, *args, **kwargs
+    preset: str = __STANDARD_PRESET,
+    fxp: str = __STANDARD_FXP,
+    sustain_pedal: int = 1,
+    *args,
+    **kwargs,
 ) -> type:
     return mk_pianoteq_engine(
         preset=preset,
@@ -247,7 +254,7 @@ def mk_contrasting_pte(
             "q_factor": 0.2,
             "string_length": 6,
             "hammer_noise": 1,
-            "sustain_pedal": 1,
+            "sustain_pedal": sustain_pedal,
             "hammer_hard_piano": 0.5,
             "hammer_hard_mezzo": 0.75,
             "hammer_hard_forte": 1.5,
@@ -259,7 +266,7 @@ def mk_contrasting_pte(
             "q_factor": 3.5,
             "string_length": 1,
             "hammer_noise": 3,
-            "sustain_pedal": 1,
+            "sustain_pedal": sustain_pedal,
             "hammer_hard_piano": 0.8,
             "hammer_hard_mezzo": 1.3,
             "hammer_hard_forte": 2,
@@ -271,7 +278,11 @@ def mk_contrasting_pte(
 
 
 def mk_dreamy_pte(
-    preset: str = __STANDARD_PRESET, fxp: str = __STANDARD_FXP, *args, **kwargs
+    preset: str = __STANDARD_PRESET,
+    fxp: str = __STANDARD_FXP,
+    sustain_pedal: int = 1,
+    *args,
+    **kwargs,
 ) -> type:
     return mk_pianoteq_engine(
         preset=preset,
@@ -284,12 +295,9 @@ def mk_dreamy_pte(
             "string_length": infit.Uniform(8, 10),
             "sympathetic_resonance": infit.Uniform(2, 5),
             "hammer_noise": infit.Uniform(0.2, 1.0, seed=10),
-            "sustain_pedal": 1,
-            # "hammer_hard_piano": 0.4,
+            "sustain_pedal": sustain_pedal,
             "hammer_hard_piano": 0.5,
-            # "hammer_hard_mezzo": 0.65,
             "hammer_hard_mezzo": 0.85,
-            # "hammer_hard_forte": 0.885,
             "hammer_hard_forte": 1.15,
             "strike_point": infit.Uniform(1 / 64, 1 / 8),
             "pinch_harmonic_pedal": 0,
@@ -304,13 +312,10 @@ def mk_dreamy_pte(
             "q_factor": infit.Uniform(0.2, 1),
             "string_length": infit.Uniform(4, 7),
             "direct_sound_duration": infit.Uniform(2, 4, seed=3),
-            # "hammer_hard_piano": 0.25,
             "hammer_hard_piano": 0.35,
-            # "hammer_hard_mezzo": 0.525,
             "hammer_hard_mezzo": 0.625,
-            # "hammer_hard_forte": 0.75,
             "hammer_hard_forte": 0.895,
-            "sustain_pedal": 1,
+            "sustain_pedal": sustain_pedal,
             "sound_speed": infit.Uniform(200, 500),
             "sympathetic_resonance": infit.Uniform(1, 2),
             "pinch_harmonic_pedal": infit.Cycle((1, 0, 1)),
@@ -325,7 +330,11 @@ def mk_dreamy_pte(
 
 
 def mk_super_dreamy_pte(
-    preset: str = __STANDARD_PRESET, fxp: str = __STANDARD_FXP, *args, **kwargs
+    preset: str = __STANDARD_PRESET,
+    fxp: str = __STANDARD_FXP,
+    sustain_pedal: int = 1,
+    *args,
+    **kwargs,
 ) -> type:
     return mk_pianoteq_engine(
         preset=preset,
@@ -338,7 +347,7 @@ def mk_super_dreamy_pte(
             "string_length": infit.Uniform(8, 10),
             "sympathetic_resonance": infit.Uniform(2, 5),
             "hammer_noise": infit.Uniform(0.2, 1.0, seed=10),
-            "sustain_pedal": 1,
+            "sustain_pedal": sustain_pedal,
             "hammer_hard_piano": 0.3,
             "hammer_hard_mezzo": 0.55,
             "hammer_hard_forte": 0.785,
@@ -358,7 +367,7 @@ def mk_super_dreamy_pte(
             "hammer_hard_piano": 0.3,
             "hammer_hard_mezzo": 0.4,
             "hammer_hard_forte": 0.6,
-            "sustain_pedal": 1,
+            "sustain_pedal": sustain_pedal,
             "sound_speed": infit.Uniform(200, 500),
             "sympathetic_resonance": infit.Uniform(1, 2),
             "pinch_harmonic_pedal": infit.Cycle((1, 0, 1)),
@@ -366,6 +375,57 @@ def mk_super_dreamy_pte(
             "strike_point": infit.Uniform(1 / 64, 1 / 32),
             "hammer_noise": infit.Uniform(0.65, 1.25, seed=1000),
             "blooming_energy": 0,
+        },
+        *args,
+        **kwargs,
+    )
+
+
+def mk_super_soft_pte(
+    preset: str = __STANDARD_PRESET,
+    fxp: str = __STANDARD_FXP,
+    sustain_pedal: int = 1,
+    *args,
+    **kwargs,
+) -> type:
+    return mk_pianoteq_engine(
+        preset=preset,
+        fxp=fxp,
+        parameter_non_dissonant_pitches={
+            "impedance": infit.Uniform(2, 2.5),
+            "cutoff": infit.Uniform(2.3, 2.6, seed=2),
+            "q_factor": infit.Uniform(0.3, 0.6, seed=2),
+            "direct_sound_duration": infit.Uniform(4, 5, seed=3),
+            "string_length": infit.Uniform(8, 10),
+            "sympathetic_resonance": infit.Uniform(2, 5),
+            "hammer_noise": infit.Uniform(0.2, 0.4, seed=10),
+            "sustain_pedal": sustain_pedal,
+            "hammer_hard_piano": 0.1,
+            "hammer_hard_mezzo": 0.2,
+            "hammer_hard_forte": 0.3,
+            "strike_point": infit.Uniform(1 / 64, 1 / 8),
+            "pinch_harmonic_pedal": 1,
+            "buff_stop_pedal": infit.Cycle((0, 1, 1, 0, 1)),
+            "sound_speed": infit.Uniform(200, 500),
+            "blooming_energy": infit.Uniform(1.55, 2),
+            "blooming_inertia": infit.Uniform(1.55, 2.8),
+        },
+        parameter_dissonant_pitches={
+            "impedance": infit.Uniform(2.5, 3),
+            "cutoff": infit.Uniform(2.3, 2.6, seed=2),
+            "q_factor": infit.Uniform(0.3, 0.6, seed=2),
+            "direct_sound_duration": infit.Uniform(4, 5, seed=3),
+            "string_length": infit.Uniform(8, 10),
+            "sympathetic_resonance": infit.Uniform(2, 5),
+            "hammer_noise": infit.Uniform(0.2, 0.5, seed=10),
+            "sustain_pedal": sustain_pedal,
+            "hammer_hard_piano": 0.05,
+            "hammer_hard_mezzo": 0.1,
+            "hammer_hard_forte": 0.2,
+            "strike_point": infit.Uniform(1 / 64, 1 / 8),
+            "pinch_harmonic_pedal": 1,
+            "buff_stop_pedal": 1,
+            "sound_speed": infit.Uniform(200, 500),
         },
         *args,
         **kwargs,
