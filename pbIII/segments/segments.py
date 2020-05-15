@@ -96,12 +96,20 @@ class PBIII_Segment(MU.Segment):
         dynamic_range_of_voices: tuple = (0.2, 0.95),
         max_spectrum_profile_change: int = 10,
         voices_overlaying_time: float = 1,
+        voices_entry_delay_per_voice: tuple = (0, 0, 0),
         glitter_include_dissonant_pitches: bool = True,
         glitter_modulater_per_voice: tuple = ("randomi", "randomi", "randomi"),
+        glitter_attack_duration: infit.InfIt = 0.5,
+        glitter_release_duration: infit.InfIt = 0.5,
+        glitter_type: str = "glitter",
+        glitter_chord=None,
+        glitter_register_per_voice: tuple = (2, 2, 2),
+        glitter_wave_form_per_voice: tuple = ("sine", "sine", "sine"),
+        glitter_volume_per_voice: tuple = (1, 1, 1),
         radio_samples: tuple = (
-            "pbIII/samples/radio/bielefeld/2.wav",
-            "pbIII/samples/radio/UK/4.wav",
-            "pbIII/samples/radio/Italy/2.wav",
+            globals.SAM_RADIO_BIELEFELD[2],
+            globals.SAM_RADIO_UK[4],
+            globals.SAM_RADIO_ITALY[2],
         ),
         radio_make_envelope: bool = True,
         radio_average_volume: float = 0.3,
@@ -111,6 +119,9 @@ class PBIII_Segment(MU.Segment):
         radio_crossfade_duration: float = 0.5,
         radio_shadow_time: float = 0.175,
         radio_silent_channels: tuple = tuple([]),
+        radio_attack_duration: infit.InfIt = infit.Gaussian(0.4, 0.095),
+        radio_release_duration: infit.InfIt = infit.Gaussian(0.4, 0.095),
+        tremolo_maker_per_voice: tuple = (None, None, None),
         cp_constraints_interpolation: tuple = tuple([]),
         cp_add_dissonant_pitches_to_nth_voice: tuple = (True, True, True),
         speech_init_attributes: dict = {},
@@ -137,6 +148,12 @@ class PBIII_Segment(MU.Segment):
         metrical_numbers: tuple = None,
     ) -> None:
 
+        assert glitter_type in ("glitter", "drone")
+
+        if glitter_chord is None:
+            glitter_chord = harmony.find_harmony(gender=gender)[0]
+
+        self._voices_entry_delay_per_voice = voices_entry_delay_per_voice
         self._n_bars = n_bars
         self._cp_constraints_interpolation = cp_constraints_interpolation
         self._gender = gender
@@ -155,6 +172,7 @@ class PBIII_Segment(MU.Segment):
         self._cp_add_dissonant_pitches_to_nth_voice = (
             cp_add_dissonant_pitches_to_nth_voice
         )
+        self._tremolo_maker_per_voice = tremolo_maker_per_voice
 
         if rhythm_maker is None:
 
@@ -225,7 +243,15 @@ class PBIII_Segment(MU.Segment):
         if include_glitter:
             init_attributes.update(
                 self.make_glitter_voices(
-                    glitter_include_dissonant_pitches, glitter_modulater_per_voice
+                    glitter_include_dissonant_pitches,
+                    glitter_modulater_per_voice,
+                    glitter_attack_duration,
+                    glitter_release_duration,
+                    glitter_type,
+                    glitter_chord,
+                    glitter_register_per_voice,
+                    glitter_wave_form_per_voice,
+                    glitter_volume_per_voice,
                 )
             )
 
@@ -268,6 +294,8 @@ class PBIII_Segment(MU.Segment):
                     max_volume=radio_max_volume,
                     shadow_time=radio_shadow_time,
                     silent_channels=radio_silent_channels,
+                    attack_duration=radio_attack_duration,
+                    release_duration=radio_release_duration,
                 )
             )
 
@@ -335,16 +363,20 @@ class PBIII_Segment(MU.Segment):
 
         for (
             v_idx,
+            entry_delay,
             voice,
             spectrum_profile_per_tone,
             volume_per_tone,
             pteq_engine,
+            tremolo,
         ) in zip(
             range(len(self._counterpoint_result[0])),
+            self._voices_entry_delay_per_voice,
             self._counterpoint_result[0],
             self._attribute_maker_inner.spectrum_profile_per_tone,
             self._attribute_maker_inner.volume_per_tone_per_voice,
             self._pteq_engine_per_voice,
+            self._tremolo_maker_per_voice
         ):
             sound_engine = pteq_engine(
                 self._tempo_factor,
@@ -354,6 +386,7 @@ class PBIII_Segment(MU.Segment):
                 volume_per_tone,
                 spectrum_profile_per_tone,
                 overlaying_time=self._voices_overlaying_time,
+                tremolo=tremolo
             )
 
             voice_name = "voice{}{}".format(self._gender_code, v_idx)
@@ -361,7 +394,7 @@ class PBIII_Segment(MU.Segment):
             init_attributes.update(
                 {
                     voice_name: {
-                        "start": 0,
+                        "start": entry_delay,
                         "duration": self._duration_per_voice,
                         "sound_engine": sound_engine,
                     }
@@ -388,45 +421,115 @@ class PBIII_Segment(MU.Segment):
         return init_attributes
 
     def make_glitter_voices(
-        self, include_dissonant_pitches: bool, glitter_modulater_per_voice: tuple
+        self,
+        include_dissonant_pitches: bool,
+        glitter_modulater_per_voice: tuple,
+        glitter_attack_duration: infit.InfIt,
+        glitter_release_duration: infit.InfIt,
+        glitter_type: str,
+        glitter_chord: tuple,
+        glitter_register_per_voice: tuple,
+        glitter_wave_form_per_voice: tuple,
+        glitter_volume_per_voice: tuple,
     ) -> dict:
         init_attributes = {}
-        if include_dissonant_pitches:
-            voice_base = self._counterpoint_result[0]
-        else:
-            voice_base = self._counterpoint_result[1]
 
-        voices = tuple(
-            old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
-            for vox in voice_base
-        )
         glitter_duration = self._duration_per_voice + self._anticipation_time
         glitter_duration += self._overlaying_time
 
-        for combination, modulator in zip(
-            tuple(itertools.combinations(tuple(range(3)), 2)),
-            glitter_modulater_per_voice,
-        ):
-            sound_engine = glitter.GlitterEngine(
-                voices[combination[0]],
-                voices[combination[1]],
-                self._tempo_factor,
-                anticipation_time=self._anticipation_time,
-                overlaying_time=self._overlaying_time,
-                modulator=modulator,
+        if glitter_type == "glitter":
+
+            if include_dissonant_pitches:
+                voice_base = self._counterpoint_result[0]
+            else:
+                voice_base = self._counterpoint_result[1]
+
+            voices = tuple(
+                old.Melody(old.Tone(p, r) for p, r in zip(vox[0], vox[1]))
+                for vox in voice_base
             )
+            for combination, modulator in zip(
+                tuple(itertools.combinations(tuple(range(3)), 2)),
+                glitter_modulater_per_voice,
+            ):
+                sound_engine = glitter.GlitterEngine(
+                    voices[combination[0]],
+                    voices[combination[1]],
+                    self._tempo_factor,
+                    anticipation_time=self._anticipation_time,
+                    overlaying_time=self._overlaying_time,
+                    modulator=modulator,
+                    attack_duration=glitter_attack_duration,
+                    release_duration=glitter_release_duration,
+                )
 
-            voice_name = "glitter{}{}{}".format(self._gender_code, *sorted(combination))
+                voice_name = "glitter{}{}{}".format(
+                    self._gender_code, *sorted(combination)
+                )
 
-            init_attributes.update(
-                {
-                    voice_name: {
-                        "start": -self._anticipation_time,
-                        "duration": glitter_duration,
-                        "sound_engine": sound_engine,
+                init_attributes.update(
+                    {
+                        voice_name: {
+                            "start": -self._anticipation_time,
+                            "duration": glitter_duration,
+                            "sound_engine": sound_engine,
+                        }
                     }
-                }
+                )
+
+        elif glitter_type == "drone":
+
+            pitches = glitter_chord(*self._harmonic_primes)
+
+            pitches = (
+                p.register(register)
+                for p, register in zip(
+                    pitches, glitter_register_per_voice
+                )
+                if not p.is_empty
             )
+            frequencies = tuple(
+                None if p.is_empty else p.float * globals.CONCERT_PITCH for p in pitches
+            )
+
+            combinations = ((0, 1), (0, 2), (1, 2))
+
+            for idx, frequency in enumerate(frequencies):
+
+                if frequency is not None:
+
+                    voice_name = "glitter{}{}{}".format(
+                        self._gender_code, *combinations[idx]
+                    )
+
+                    volume = glitter_volume_per_voice[idx]
+                    modulator = glitter_modulater_per_voice[idx]
+                    wave_form = glitter_wave_form_per_voice[idx]
+
+                    sound_engine = glitter.SineDroneEngine(
+                        frequency,
+                        glitter_duration,
+                        self._anticipation_time,
+                        self._overlaying_time,
+                        glitter_attack_duration,
+                        glitter_release_duration,
+                        volume,
+                        modulator,
+                        wave_form,
+                    )
+
+                    init_attributes.update(
+                        {
+                            voice_name: {
+                                "start": -self._anticipation_time,
+                                "duration": glitter_duration,
+                                "sound_engine": sound_engine,
+                            }
+                        }
+                    )
+        else:
+
+            raise NotImplementedError()
 
         return init_attributes
 
@@ -447,6 +550,8 @@ class PBIII_Segment(MU.Segment):
         max_volume: float,
         shadow_time: float,
         silent_channels: tuple,
+        attack_duration: infit.InfIt,
+        release_duration: infit.InfIt,
     ) -> dict:
         n_samples = len(samples)
 
@@ -542,8 +647,8 @@ class PBIII_Segment(MU.Segment):
                         crossfade_duration,
                         anticipation_time=anticipation_time,
                         overlaying_time=overlaying_time,
-                        attack_duration=0.35,
-                        release_duration=0.35,
+                        attack_duration=attack_duration,
+                        release_duration=release_duration,
                     )
 
                     voice_name = "natural_radio_{}".format(absolute_voice_idx)
@@ -616,12 +721,13 @@ class PBIII_Segment(MU.Segment):
             self._attribute_maker_outer.volume_per_tone_per_voice,
             self._diva_engine_per_voice,
         ):
-            voice = tuple(
-                old.Tone(p, r, volume=v)
-                for p, r, v in zip(*(tuple(voice) + (volume_per_tone,)))
-            )
-            diva_path = "{}/diva{}{}.mid".format(path, self._gender_code, v_idx)
-            diva_engine(voice, self._tempo_factor).render(diva_path)
+            if diva_engine is not None:
+                voice = tuple(
+                    old.Tone(p, r, volume=v)
+                    for p, r, v in zip(*(tuple(voice) + (volume_per_tone,)))
+                )
+                diva_path = "{}/diva{}{}.mid".format(path, self._gender_code, v_idx)
+                diva_engine(voice, self._tempo_factor).render(diva_path)
 
     def render(self, path: str) -> None:
         if self._include_diva:
@@ -707,6 +813,8 @@ class Chord(RhythmicCP):
 
         if "rhythm_maker" not in kwargs:
             kwargs.update({"rhythm_maker": rhythm_maker})
+
+        kwargs.update({"glitter_chord": chord[0]})
 
         super().__init__(name=name, start_harmony=chord, **kwargs)
 

@@ -168,3 +168,40 @@ class FloatingDivaMidiEngine(DivaMidiEngine):
                 )
             ),
         }
+
+
+class FlageoletDivaMidiEngine(DivaMidiEngine):
+    @property
+    def _init_arguments(self) -> dict:
+        """define class specfic data here when inherting"""
+        min_vol = 0.4
+        max_vol = 1
+
+        return {
+            "volume_curve": infit.Cycle(
+                (
+                    interpolations.FallingRising(min_vol, max_vol),
+                    interpolations.FallingRising(min_vol, max_vol),
+                    interpolations.Falling(min_vol, max_vol),
+                    interpolations.RisingFalling(min_vol, max_vol),
+                    interpolations.Rising(min_vol, max_vol),
+                    interpolations.FallingRising(min_vol, max_vol),
+                )
+            ),
+            "osc_noise_volume": infit.Uniform(30, 64),
+            "osc_mix": infit.Value(infit.Gaussian(70, 5)),
+            "osc_tune_mod_depth2": infit.Value(infit.Gaussian(0, 1)),
+            "vcf1_freq_mod_depth": infit.Uniform(0, 10),
+            "vcf1_filter_fm": infit.Cycle(
+                (
+                    0,
+                    interpolations.Rising(0, 4),
+                    interpolations.FallingRising(-4, 4),
+                    interpolations.Falling(0, 4),
+                    0,
+                    interpolations.RisingFalling(0, 4),
+                    interpolations.Falling(-4, 0),
+                    interpolations.Rising(-4, 0),
+                )
+            ),
+        }

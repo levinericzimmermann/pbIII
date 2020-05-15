@@ -55,7 +55,7 @@ def make(name: str = "ONE", gender=False, group=0, sub_group0=1):
             pteq_engine_per_voice=(
                 pteq.mk_super_soft_pte(
                     empty_attack_dynamic_maker=infit.Value(0.2),
-                    fxp='"pbIII/fxp/VibraphoneV-BHumanizednostretching.fxp"',
+                    fxp='"pbIII/fxp/GlockenspielHumanizednostretching.fxp"',
                     preset=None,
                     sustain_pedal=0,
                 ),

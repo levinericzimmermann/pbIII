@@ -4,6 +4,7 @@ from mutools import common_harmonics
 from mutools import synthesis
 
 from mu.sco import old
+from mu.utils import infit
 from mu.utils import tools
 
 from pbIII.globals import globals
@@ -22,22 +23,27 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
         overlaying_time: float = 0,
         n_voices: int = 5,
         max_harmonic: int = 32,
-        attack_duration: float = 0.5,
-        release_duration: float = 0.5,
+        attack_duration: infit.InfIt = infit.Value(0.5),
+        release_duration: infit.InfIt = infit.Value(0.5),
         modulator: str = "randomi",
         # modulator: str = STANDARD_MODULATOR,
     ) -> None:
-        self.__modulator = modulator
+        self._modulator = modulator
         self.harmonic_melodies = self.make_melodies(
             voice0, voice1, n_voices, max_harmonic
         )
+
+        if not isinstance(attack_duration, infit.InfIt):
+            attack_duration = infit.Value(attack_duration)
+
+        if not isinstance(release_duration, infit.InfIt):
+            release_duration = infit.Value(release_duration)
 
         self.__anticipation_time = anticipation_time
         self.__overlaying_time = overlaying_time
         self.__tempo_factor = tempo_factor
         self.__attack_duration = attack_duration
         self.__release_duration = release_duration
-        self.__envelope_duration = attack_duration + release_duration
         self.__duration = float(voice0.duration * tempo_factor)
 
     @staticmethod
@@ -52,35 +58,34 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
     @property
     def orc(self) -> str:
         envelope_line = r"aEnv linseg 0, "
-        envelope_line += r"{0}, 1, p3 - {0} - {1}, 1, {1}, 0".format(
-            self.__attack_duration, self.__release_duration
-        )
-        if self.__modulator is "lfo":
-            modulator_line = "aRandom randh 10, 30\n"
-            modulator_line += r"aModulator lfo 1, aRandom + 3"
+        envelope_line += r"p6, 1, p3 - p6 - p7, 1, p7, 0"
 
-        elif self.__modulator is "randomi":
+        if self._modulator == "lfo":
+            modulator_line = "kRandom randh 10, 30\n"
+            modulator_line += r"aModulator lfo 1, kRandom + 3"
+
+        elif self._modulator == "randomi":
             modulator_line = "kMetaModulator randomi 4, 20, 4\n"
             modulator_line += "aModulator randomi -1, 1, kMetaModulator"
 
-        elif self.__modulator is "randomh":
+        elif self._modulator == "randomh":
             modulator_line = "kMetaModulator randomi 4, 20, 4\n"
             modulator_line += "aModulator randomh -1, 1, kMetaModulator"
 
-        elif self.__modulator is None:
+        elif self._modulator is None:
             modulator_line = "aModulator = 1"
 
-        elif self.__modulator[-4:] == r".wav":
+        elif self._modulator[-4:] == r".wav":
             modulator_line = 'aModulator diskin2 "{}", 1, 0, 1, 6, 4'.format(
-                self.__modulator
+                self._modulator
             )
 
         else:
-            msg = "Unknown modulator {}".format(self.__modulator)
+            msg = "Unknown modulator {}".format(self._modulator)
             raise NotImplementedError(msg)
 
-        out_line_sine = "out asig * aEnv * 0.3"
-        out_line = "out asig * aEnv * 0.15"
+        out_line_sine = "out asig * aEnv * 0.3 * p5"
+        out_line = "out asig * aEnv * 0.15 * p5"
         endin_line = r"endin"
 
         lines = [
@@ -97,9 +102,7 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
             lines.append("instr {}".format(instr_idx + 1))
             lines.append(modulator_line)
             lines.append(
-                r"asig poscil3 p5 * ((aModulator + 1) * 0.5), p4, {}".format(
-                    ftable_name
-                )
+                r"asig poscil3 ((aModulator + 1) * 0.5), p4, {}".format(ftable_name)
             )
             lines.append(envelope_line)
             if instr_idx == 0:
@@ -123,16 +126,22 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
             ):
 
                 if not pitch.is_empty:
-                    duration += self.__anticipation_time + self.__overlaying_time
-                    if duration <= self.__envelope_duration:
-                        duration = self.__envelope_duration + 0.01
+                    attack_duration = next(self.__attack_duration)
+                    release_duration = next(self.__release_duration)
+                    envelope_duration = attack_duration + release_duration
 
-                    line = "i{} {} {} {} {}".format(
+                    duration += self.__anticipation_time + self.__overlaying_time
+                    if duration <= envelope_duration:
+                        duration = envelope_duration + 0.01
+
+                    line = "i{} {} {} {} {} {} {}".format(
                         next(instrument_number),
                         start_position,
                         duration,
                         pitch.freq * globals.CONCERT_PITCH,
                         volume,
+                        attack_duration,
+                        release_duration,
                     )
                     lines.append(line)
 
@@ -144,3 +153,53 @@ class GlitterEngine(synthesis.BasedCsoundEngine):
     @property
     def cname(self) -> str:
         return ".glitter"
+
+
+class SineDroneEngine(GlitterEngine):
+    def __init__(
+        self,
+        freq: float,
+        duration: float,
+        anticipation_time: float = 0,
+        overlaying_time: float = 0,
+        attack_duration: float = 0.5,
+        release_duration: float = 7,
+        volume: float = 0.75,
+        modulator: str = None,
+        wave_form: str = "sine",
+    ) -> None:
+        self.__freq = freq
+        self.__duration = duration + anticipation_time + overlaying_time
+        self.__volume = volume
+        self._modulator = modulator
+        self.__anticipation_time = anticipation_time
+        self.__overlaying_time = overlaying_time
+        self.__attack_duration = attack_duration
+        self.__release_duration = release_duration
+        self.__envelope_duration = attack_duration + release_duration
+        self.__instrument_number = {"sine": 1, "saw": 2, "square": 3, "tri": 4}[
+            wave_form
+        ]
+
+    @property
+    def cname(self) -> str:
+        return ".glitter_drone"
+
+    @property
+    def sco(self) -> str:
+        duration = self.__duration
+        if duration <= self.__envelope_duration:
+            duration = self.__envelope_duration + 0.01
+
+        lines = (
+            "i{} {} {} {} {} {} {}".format(
+                self.__instrument_number,
+                0,
+                duration,
+                self.__freq,
+                self.__volume,
+                self.__attack_duration,
+                self.__release_duration,
+            ),
+        )
+        return "\n".join(lines)

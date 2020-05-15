@@ -7,7 +7,7 @@ setup(
     description="pbIII is an audio installation for 9 radios",
     author="Levin Eric Zimmermann",
     author_email="levin-eric.zimmermann@folkwang-uni.de",
-    url="https://github.com/levinericzimmermann/pbII",
+    url="https://github.com/levinericzimmermann/pbIII",
     packages=[
         "pbIII",
         "pbIII.fragments",
